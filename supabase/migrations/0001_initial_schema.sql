@@ -101,10 +101,46 @@ create policy "participants read connection requests"
 create policy "requester creates connection requests"
   on public.connection_requests for insert to authenticated
   with check (auth.uid() = requester_id and requester_id <> recipient_id);
-create policy "participants update connection requests"
-  on public.connection_requests for update to authenticated
-  using (auth.uid() = requester_id or auth.uid() = recipient_id)
-  with check (auth.uid() = requester_id or auth.uid() = recipient_id);
+-- No direct UPDATE policy: participants must use the checked RPC below so they cannot
+-- rewrite the other participant's ID or change protected fields.
+create or replace function public.respond_to_connection_request(p_request_id uuid, p_decision text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_user_id uuid := auth.uid();
+begin
+  if v_user_id is null then
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+  if p_decision not in ('accepted', 'declined', 'cancelled') then
+    raise exception 'Invalid decision' using errcode = '22023';
+  end if;
+
+  if p_decision = 'cancelled' then
+    update public.connection_requests
+       set status = 'cancelled', updated_at = now()
+     where id = p_request_id
+       and requester_id = v_user_id
+       and status = 'pending';
+  else
+    update public.connection_requests
+       set status = p_decision, updated_at = now()
+     where id = p_request_id
+       and recipient_id = v_user_id
+       and status = 'pending';
+  end if;
+
+  if not found then
+    raise exception 'Request not found or action not permitted' using errcode = '42501';
+  end if;
+end;
+$;
+
+revoke all on function public.respond_to_connection_request(uuid, text) from public, anon;
+grant execute on function public.respond_to_connection_request(uuid, text) to authenticated;
 create policy "requester deletes own connection requests"
   on public.connection_requests for delete to authenticated using (auth.uid() = requester_id);
 
