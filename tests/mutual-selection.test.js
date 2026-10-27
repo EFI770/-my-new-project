@@ -46,3 +46,13 @@ test('public card strips phone, email, address and private interest flags', () =
   assert.equal('email' in card, false);
   assert.equal('viewerInterested' in card, false);
 });
+
+test('unknown consent or interest values fail closed', () => {
+  assert.equal(isMutualInterest({ viewerInterested: true, candidateInterested: undefined }), false);
+  assert.equal(canInitiateContact({
+    viewerInterested: true,
+    candidateInterested: true,
+    viewerContactConsent: 'yes',
+    candidateContactConsent: true,
+  }), false);
+});
