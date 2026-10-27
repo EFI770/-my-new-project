@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1b4332">
+  <meta name="description" content="הדגמת בחירת חברותא בפרטיות ובהסכמה הדדית">
+  <title>חברותא — בחירת חברותא</title>
+  <link rel="stylesheet" href="./assets/candidate-selection.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./index.html">חברותא</a>
+    <span class="prototype-pill">הדגמת מוצר</span>
+  </header>
+  <main class="page">
+    <section class="notice" role="status">
+      <strong>סביבת הדגמה בלבד</strong>
+      <p>הפרופילים וההתאמות כאן מדומים. הבחירות נשמרות בזיכרון של העמוד בלבד. אין כאן משתמשים אמיתיים, שרת, או שליחת הודעות.</p>
+    </section>
+    <section class="intro">
+      <p class="eyebrow">לומדים ביחד, בוחרים בנחת</p>
+      <h1>מצאו חברותא שמתאימה לכם</h1>
+      <p>עיינו באנשים שמתאימים להעדפות הלימוד שלכם. הבחירה שלכם פרטית: אף אחד לא מקבל הודעת סירוב או יודע שלא בחרתם בו.</p>
+    </section>
+    <section class="preferences" aria-labelledby="preferences-title">
+      <h2 id="preferences-title">מה תרצו ללמוד?</h2>
+      <label for="topic">נושא לימוד</label>
+      <select id="topic">
+        <option value="all">כל הנושאים</option>
+        <option value="Shabbat">מסכת שבת</option>
+        <option value="Berachot">מסכת ברכות</option>
+        <option value="Chassidut">חסידות</option>
+      </select>
+      <label for="time">זמן לימוד</label>
+      <select id="time">
+        <option value="all">כל הזמנים</option>
+        <option value="evening">ערב</option>
+        <option value="morning">בוקר</option>
+        <option value="afternoon">אחר הצהריים</option>
+      </select>
+    </section>
+    <section aria-labelledby="candidates-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">בחירה אישית</p><h2 id="candidates-title">אנשים שיכולים להתאים לכם</h2></div>
+        <span id="count" class="count" aria-live="polite"></span>
+      </div>
+      <div id="candidate-list" class="candidate-list"></div>
+    </section>
+    <section id="mutual-section" class="mutual-section" hidden aria-labelledby="mutual-title">
+      <p class="eyebrow">הסכמה הדדית</p>
+      <h2 id="mutual-title">יש עניין הדדי!</h2>
+      <p id="mutual-copy">שני הצדדים הביעו עניין. עדיין לא נחשף שום פרט קשר.</p>
+      <label class="consent-row">
+        <input id="contact-consent" type="checkbox">
+        <span>אני מסכים/ה לפתוח אפשרות ליצירת קשר עם האדם הזה. ההסכמה אינה חושפת את מספר הטלפון שלי בשלב זה.</span>
+      </label>
+      <button id="confirm-contact" class="primary" type="button" disabled>אישור רצון ליצור קשר</button>
+      <p id="contact-status" class="status" aria-live="polite"></p>
+    </section>
+    <section class="privacy-note">
+      <h2>איך נשמרת הפרטיות?</h2>
+      <ul>
+        <li>בחירה חד־צדדית נשארת פרטית.</li>
+        <li>אין הודעת סירוב, ואין חשיפת מי לא בחר במי.</li>
+        <li>יצירת קשר אפשרית רק אחרי עניין הדדי והסכמה נפרדת.</li>
+        <li>במערכת אמיתית, השרת חייב לאכוף את הכללים האלה; הסתרה בממשק בלבד אינה אבטחה.</li>
+      </ul>
+    </section>
+  </main>
+  <footer>חברותא · אבטיפוס לבדיקת חוויית משתמש · לא לשימוש עם מידע אישי אמיתי</footer>
+  <script type="module" src="./assets/candidate-selection.js"></script>
+</body>
+</html>
