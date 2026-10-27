@@ -40,7 +40,7 @@ test("unverified email accounts are blocked at login", () => {
 test("demo limitations are disclosed and not misrepresented as production auth", () => {
   assert.match(app, /localStorage/);
   assert.match(app, /אימות אימייל מדומה לצורך דמו/);
-  assert.match(readme, /עדיין לא מערכת ייצור מאובטחת/);
+  assert.match(readme, /לא מערכת ייצור מאובטחת/);
   assert.match(readme, /אין להזין כרגע מידע אישי או רגיש/);
 });
 
