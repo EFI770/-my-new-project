@@ -1,0 +1,12 @@
+{
+  "name": "chavruta-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hebrew RTL Chavruta matching app prototype",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
