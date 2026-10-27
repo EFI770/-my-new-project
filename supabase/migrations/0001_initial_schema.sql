@@ -158,5 +158,14 @@ create policy "reporter can create report"
 create policy "reporter can read own reports"
   on public.user_reports for select to authenticated using (auth.uid() = reporter_id);
 
--- Do not grant anonymous access. Do not expose service_role keys in browser code.
-revoke all on public.profiles, public.study_requests, public.connection_requests, public.user_blocks, public.user_reports from anon;
+-- Explicit privileges: RLS policies still decide which rows a user may access.
+-- Remove inherited/default privileges first, including PUBLIC and anonymous access.
+revoke all on public.profiles, public.study_requests, public.connection_requests, public.user_blocks, public.user_reports from public, anon, authenticated;
+grant select, insert, update, delete on public.profiles to authenticated;
+grant select, insert, update, delete on public.study_requests to authenticated;
+grant select, insert, delete on public.connection_requests to authenticated;
+grant select, insert, delete on public.user_blocks to authenticated;
+grant select, insert on public.user_reports to authenticated;
+
+-- Do not expose service_role keys in browser code. Apply this migration only after review
+-- in a dedicated Supabase project, then test every policy as anon and as multiple users.
