@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>חברותא — פיילוט שכונתי</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: #f6f4ef; color: #1f2937; }
+  main { max-width: 34rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+  h1 { font-size: 1.6rem; margin: 0.5rem 0; }
+  .card { background: #fff; border: 1px solid #e5e1d8; border-radius: 0.75rem; padding: 1rem; margin-top: 1rem; }
+  label { display: block; font-weight: 600; margin: 0.9rem 0 0.25rem; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: 0.55rem; border: 1px solid #d4cfc4; border-radius: 0.5rem; font: inherit; background: #fff; }
+  textarea { min-height: 4.5rem; }
+  .hint { font-size: 0.85rem; color: #6b7280; margin-top: 0.25rem; }
+  .privacy { font-size: 0.9rem; background: #eef6ee; border: 1px solid #cfe5cf; border-radius: 0.5rem; padding: 0.6rem 0.8rem; margin-top: 1rem; }
+  button { margin-top: 1.2rem; width: 100%; padding: 0.8rem; font: inherit; font-weight: 700; border: 0; border-radius: 0.6rem; background: #14532d; color: #fff; cursor: pointer; }
+  button:disabled { background: #9ca3af; cursor: default; }
+  #preview { white-space: pre-wrap; background: #f3f4f6; border-radius: 0.5rem; padding: 0.6rem 0.8rem; margin-top: 0.8rem; font-size: 0.9rem; display: none; }
+  .err { color: #b91c1c; font-size: 0.85rem; margin-top: 0.5rem; display: none; }
+  a.back { color: #14532d; }
+</style>
+</head>
+<body>
+<main>
+  <h1>חברותא — פיילוט שכונתי</h1>
+  <p>מחפשים חברותא ללימוד? בפיילוט הזה ההתאמה נעשית <strong>ידנית</strong>: ממלאים את הפרטים, שולחים ב-WhatsApp, ונחזור אליכם עם הצעה לחברותא מתאימה.</p>
+
+  <div class="card">
+    <label for="name">שם מלא</label>
+    <input id="name" maxlength="80" autocomplete="name">
+
+    <label for="topic">נושא לימוד</label>
+    <input id="topic" maxlength="120" placeholder="למשל: מסכת ברכות, חומש עם רש״י, הלכה">
+    <label for="level">רמה</label>
+    <select id="level">
+      <option value=""></option>
+      <option>מתחיל</option>
+      <option>בינוני</option>
+      <option>מתקדם</option>
+    </select>
+
+    <label for="days">ימים מתאימים</label>
+    <input id="days" maxlength="120" placeholder="למשל: א, ג, ה">
+    <label for="hours">שעות מתאימות</label>
+    <input id="hours" maxlength="120" placeholder="למשל: ערב אחרי 20:30">
+    <label for="mode">אופן לימוד</label>
+    <select id="mode">
+      <option value=""></option>
+      <option>פרונטלי</option>
+      <option>טלפון</option>
+      <option>וידאו</option>
+      <option>גמיש</option>
+    </select>
+    <label for="notes">הערות (לא חובה)</label>
+    <textarea id="notes" maxlength="500"></textarea>
+
+    <div class="privacy">הפרטים לא נשמרים באתר. לחיצה על הכפתור פותחת את WhatsApp עם הודעה מוכנה — השליחה בידיים שלכם.</div>
+    <div id="preview"></div>
+    <div class="err" id="err">נא למלא שם ונושא לימוד.</div>
+    <button id="send">שליחת בקשה ב-WhatsApp</button>
+  </div>
+  <p class="hint"><a class="back" href="index.html">חזרה לאפליקציה</a></p>
+</main>
+<script type="module">
+  import { buildMessage, isValid, whatsappUrl } from './src/pilotMessage.js';
+
+  // מספר רכז הפיילוט בפורמט בינלאומי (ספרות בלבד). ריק = מצב העתקה בלבד, ללא פרסום מספר.
+  // למלא רק לאחר אישור מפורש של הרכז לפרסם את המספר באתר ציבורי.
+  const COORDINATOR_PHONE = '';
+
+  const fields = ['name', 'topic', 'level', 'days', 'hours', 'mode', 'notes'];
+  const el = Object.fromEntries(fields.map(f => [f, document.getElementById(f)]));
+  const preview = document.getElementById('preview');
+  const err = document.getElementById('err');
+  const btn = document.getElementById('send');
+  const privacy = document.querySelector('.privacy');
+
+  const HAS_COORDINATOR = whatsappUrl(COORDINATOR_PHONE, 'x') !== '';
+  btn.textContent = HAS_COORDINATOR ? 'שליחת בקשה ב-WhatsApp' : 'העתקת ההודעה לשליחה ב-WhatsApp';
+  privacy.textContent = HAS_COORDINATOR
+    ? 'הפרטים לא נשמרים באתר. לחיצה על הכפתור פותחת את WhatsApp עם הודעה מוכנה - השליחה בידיים שלכם.'
+    : 'הפרטים לא נשמרים באתר. לחיצה על הכפתור מעתיקה את ההודעה - שלחו אותה לרכז הפיילוט ב-WhatsApp.';
+
+  function current() {
+    return Object.fromEntries(fields.map(f => [f, el[f].value]));
+  }
+  function refresh() {
+    const input = current();
+    const ok = isValid(input);
+    err.style.display = ok ? 'none' : 'block';
+    preview.style.display = 'block';
+    preview.textContent = buildMessage(input);
+    return ok;
+  }
+  fields.forEach(f => el[f].addEventListener('input', refresh));
+  btn.addEventListener('click', () => {
+    if (!refresh()) return;
+    const message = buildMessage(current());
+    const url = whatsappUrl(COORDINATOR_PHONE, message);
+    if (url) window.open(url, '_blank', 'noopener');
+    else if (navigator.clipboard) {
+      navigator.clipboard.writeText(message).then(() => { btn.textContent = 'ההודעה הועתקה'; });
+    }
+  });
+  refresh();
+</script>
+</body>
+</html>
