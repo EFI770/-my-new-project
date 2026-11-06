@@ -244,7 +244,12 @@ route('GET', '/api/auth/providers', async (req, res) => {
     email: { enabled: true },
     google: {
       enabled: process.env.GOOGLE_SIGNIN_ENABLED === 'true' && !!process.env.NEON_AUTH_URL,
-      authUrl: process.env.NEON_AUTH_URL || null,
+      // Neon mode: same-origin proxy path so the vendor session cookie is
+      // first-party (third-party cookies break the OAuth callback leg on
+      // hosted origins). The vendor URL itself is never exposed to clients.
+      authUrl: process.env.GOOGLE_SIGNIN_ENABLED === 'true' && !!process.env.NEON_AUTH_URL
+        ? (AUTH_MODE === 'neon' ? '/vendor-auth' : process.env.NEON_AUTH_URL)
+        : null,
     },
   });
 });
@@ -576,12 +581,40 @@ function serveStatic(req, res) {
   res.end(fs.readFileSync(file));
 }
 
+// Same-origin proxy to Neon Auth (managed Better Auth). In Neon mode the
+// browser must reach the vendor auth endpoints through THIS origin so the
+// vendor session cookie is first-party; direct cross-site calls from a hosted
+// origin lose the cookie to third-party cookie blocking, which breaks the
+// OAuth callback/session leg. Gated to Neon mode + NEON_AUTH_URL; strip the
+// /vendor-auth prefix. No response bodies or cookies are logged or stored.
+async function proxyVendorAuth(req, res, url) {
+  const base = (process.env.NEON_AUTH_URL || '').replace(/\/+$/, '');
+  if (!base) return send(res, 503, { error: 'vendor_auth_not_configured' });
+  const target = base + url.replace(/^\/vendor-auth/, '') + ((req.url || '').includes('?') ? '?' + (req.url || '').split('?')[1] : '');
+  const headers = { 'content-type': req.headers['content-type'] || 'application/json', origin: base.replace(/\/neondb\/auth.*$/, '') };
+  const chunks = [];
+  for await (const ch of req) chunks.push(ch);
+  const body = chunks.length ? Buffer.concat(chunks) : undefined;
+  const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'manual' });
+  // first-party rewrite: strip Domain so the cookie binds to our origin
+  const setCookies = (upstream.headers.getSetCookie ? upstream.headers.getSetCookie() : [])
+    .map((c) => c.replace(/;\s*Domain=[^;]*/i, ''));
+  const outHeaders = {
+    'content-type': upstream.headers.get('content-type') || 'application/json',
+    ...(upstream.headers.get('location') ? { location: upstream.headers.get('location') } : {}),
+    ...(setCookies.length ? { 'set-cookie': setCookies } : {}),
+  };
+  res.writeHead(upstream.status, outHeaders);
+  res.end(Buffer.from(await upstream.arrayBuffer()));
+}
+
 // Request handler is exported so the same code can run as a long-lived
 // local listener (dev) or be invoked per-request by a serverless runtime
 // (hosted preview). Local behavior is unchanged.
 const handler = async (req, res) => {
   try {
     const url = (req.url || '').split('?')[0];
+    if (AUTH_MODE === 'neon' && url.startsWith('/vendor-auth/')) return proxyVendorAuth(req, res, url);
     if (!url.startsWith('/api/')) return serveStatic(req, res);
     for (const r of routes) {
       if (r.method !== req.method) continue;
