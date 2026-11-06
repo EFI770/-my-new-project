@@ -26,10 +26,10 @@ run_worker_first = true
 # chavruta_app role (least privilege, no BYPASSRLS) for all user traffic.
 [[hyperdrive]]
 binding = "HYPERDRIVE_APP"
-id = "00000000000000000000000000000001"
+id = "4fafd84309384206bcea1d504a69bda0"
 localConnectionString = "postgresql://postgres:localdev@127.0.0.1:5432/chavruta_dev"
 # neondb_owner, used only for bootstrap/binding writes (service-role mirror).
 [[hyperdrive]]
 binding = "HYPERDRIVE_ADMIN"
-id = "00000000000000000000000000000002"
+id = "780c7e8adff24094ad2ff1c6117d7200"
 localConnectionString = "postgresql://postgres:localdev@127.0.0.1:5432/chavruta_dev"
