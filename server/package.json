@@ -8,6 +8,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "jose": "^6.2.15",
     "pg": "^8.13.1"
   },
   "devDependencies": {

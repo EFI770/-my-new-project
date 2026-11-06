@@ -8,14 +8,28 @@ import pg from 'pg';
 const { Pool } = pg;
 
 export function createDb({ socketDir, database }) {
-  const pool = new Pool({ host: socketDir, database, user: 'postgres', max: 5 });
+  // Two modes:
+  // - local dev emulator: socket connection as local superuser (bootstrap/DDL),
+  //   SET ROLE authenticated for user traffic (same as Neon mode).
+  // - Neon vendor (DATABASE_APP_URL set): user traffic connects as the
+  //   least-privilege chavruta_app role (no BYPASSRLS, no table grants of its
+  //   own); DATABASE_ADMIN_URL (owner) is used ONLY for bootstrap/binding
+  //   writes that mirror the service role, never for end-user reads.
+  const neon = !!process.env.DATABASE_APP_URL;
+  const pool = neon
+    ? new Pool({ connectionString: process.env.DATABASE_APP_URL, max: Number(process.env.PGPOOL_MAX || 5) })
+    : new Pool({ host: socketDir, database, user: 'postgres', max: 5 });
+  const servicePool = neon
+    ? new Pool({ connectionString: process.env.DATABASE_ADMIN_URL || process.env.DATABASE_APP_URL, max: 2 })
+    : pool;
 
   async function withRls(userId, fn) {
     const client = await pool.connect();
     try {
       await client.query('begin');
       await client.query('set local role authenticated');
-      await client.query(`set local app.sub = '${userId}'`);
+      // Parameterized set_config: the user id is a value, never interpolated SQL.
+      await client.query(`select set_config('app.sub', $1, true)`, [String(userId)]);
       const result = await fn(client);
       await client.query('commit');
       return result;
@@ -30,7 +44,7 @@ export function createDb({ socketDir, database }) {
   // DDL / bootstrap / dev-auth tables: superuser, mirroring Supabase service_role.
   // Never used for end-user data access.
   async function asService(fn) {
-    const client = await pool.connect();
+    const client = await servicePool.connect();
     try { return await fn(client); } finally { client.release(); }
   }
 

@@ -9,6 +9,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb, mapPgError } from './db.js';
 import { hashPassword, verifyPassword, newSessionToken, sessionExpiry } from './devAuth.js';
+import { createNeonAuth } from './neonAuth.js';
+
+// Auth mode: 'dev' (default, local emulator auth) or 'neon' (vendor JWTs).
+// Neon mode verifies Neon Auth (managed Better Auth) JWTs against the project
+// JWKS and binds the verified `sub` to one app user (auth.users.auth_sub).
+const AUTH_MODE = process.env.CHAVRUTA_AUTH_MODE || 'dev';
+const neonAuth = AUTH_MODE === 'neon' ? createNeonAuth({
+  jwksUrl: process.env.NEON_AUTH_JWKS_URL,
+  issuer: process.env.NEON_AUTH_ISSUER,
+  audience: process.env.NEON_AUTH_AUDIENCE,
+}) : null;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(__dirname, '..', 'app', 'dist');
@@ -65,6 +76,19 @@ function cookies(req) {
 }
 
 async function sessionUser(req) {
+  if (AUTH_MODE === 'neon') {
+    const token = (req.headers.authorization || '').replace(/^Bearer /i, '') || null;
+    if (!token) return null;
+    let payload;
+    try { payload = await neonAuth.verify(token); } catch { return null; }
+    // Bind the verified vendor subject to the one app user it owns.
+    const row = await db.asService(async (c) => {
+      const { rows } = await c.query('select id from auth.users where auth_sub = $1', [payload.sub]);
+      return rows[0] || null;
+    });
+    if (!row) return null;
+    return { id: row.id, email: typeof payload.email === 'string' ? payload.email : null, sub: payload.sub };
+  }
   const token = cookies(req).dev_session
     || (req.headers.authorization || '').replace(/^Bearer /i, '') || null;
   if (!token) return null;
@@ -110,6 +134,31 @@ function route(method, pattern, handler) {
 // ---------- auth (dev-only) ----------
 route('POST', '/api/auth/register', async (req, res) => {
   if (rateLimited(`reg:${req.socket.remoteAddress}`, 10, 3600_000)) return send(res, 429, { error: 'rate_limited' });
+  if (AUTH_MODE === 'neon') {
+    // Vendor mode: the user already signed up with Neon Auth and presents its
+    // JWT. We bind the verified `sub` to a new app user + profile. No password
+    // ever touches this server.
+    const token = (req.headers.authorization || '').replace(/^Bearer /i, '') || null;
+    if (!token) return send(res, 401, { error: 'authentication_required' });
+    let payload;
+    try { payload = await neonAuth.verify(token); } catch { return send(res, 401, { error: 'authentication_required' }); }
+    const body = await readBody(req);
+    const displayName = cleanStr(body.displayName, 80);
+    const gender = GENDERS.has(body.gender) ? body.gender : null;
+    if (!displayName) return send(res, 400, { error: 'invalid_display_name' });
+    if (!gender) return send(res, 400, { error: 'invalid_gender' });
+    const created = await db.asService(async (c) => {
+      const existing = await c.query('select id from auth.users where auth_sub = $1', [payload.sub]);
+      if (existing.rows.length) return null;
+      const { rows } = await c.query(
+        'insert into auth.users (id, auth_sub) values (gen_random_uuid(), $1) returning id', [payload.sub]);
+      return rows[0].id;
+    });
+    if (!created) return send(res, 409, { error: 'already_registered' });
+    await db.withRls(created, (c) => c.query(
+      'insert into public.profiles (id, display_name, gender) values ($1, $2, $3)', [created, displayName, gender]));
+    return send(res, 201, { userId: created });
+  }
   const body = await readBody(req);
   const email = cleanStr(body.email, 254)?.toLowerCase();
   const password = typeof body.password === 'string' ? body.password : null;
@@ -147,6 +196,7 @@ route('POST', '/api/auth/register', async (req, res) => {
 });
 
 route('POST', '/api/auth/login', async (req, res) => {
+  if (AUTH_MODE === 'neon') return send(res, 400, { error: 'use_vendor_auth' });
   if (rateLimited(`login:${req.socket.remoteAddress}`, 20, 600_000)) return send(res, 429, { error: 'rate_limited' });
   const body = await readBody(req);
   const email = cleanStr(body.email, 254)?.toLowerCase();
@@ -169,6 +219,7 @@ route('POST', '/api/auth/login', async (req, res) => {
 });
 
 route('POST', '/api/auth/logout', async (req, res) => {
+  if (AUTH_MODE === 'neon') return send(res, 200, { ok: true });
   const token = cookies(req).dev_session;
   if (token) await db.asService((c) => c.query('delete from dev_auth.sessions where token = $1', [token]));
   send(res, 200, { ok: true }, { 'set-cookie': 'dev_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
@@ -246,7 +297,9 @@ route('DELETE', '/api/me', async (req, res, user) => {
   // BY the user are removed, reports ABOUT the user keep null user reference.
   await db.asService(async (c) => {
     await c.query('delete from auth.users where id = $1', [user.id]);
-    await c.query('delete from dev_auth.users where id = $1', [user.id]);
+    if (AUTH_MODE !== 'neon') await c.query('delete from dev_auth.users where id = $1', [user.id]);
+    // Neon mode: the vendor account itself is managed by Neon Auth and is
+    // intentionally not deleted here.
   });
   send(res, 200, { ok: true }, { 'set-cookie': 'dev_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
 });
@@ -473,7 +526,7 @@ route('POST', '/api/reports', async (req, res, user) => {
   send(res, 201, { ok: true });
 });
 
-route('GET', '/api/health', async (req, res) => send(res, 200, { ok: true, mode: 'dev-emulator' }));
+route('GET', '/api/health', async (req, res) => send(res, 200, { ok: true, mode: AUTH_MODE === 'neon' ? 'neon-vendor' : 'dev-emulator' }));
 
 // ---------- static ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json' };
