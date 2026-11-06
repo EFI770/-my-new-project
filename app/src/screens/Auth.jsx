@@ -12,6 +12,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [gender, setGender] = useState('');
+  const [attestAdult, setAttestAdult] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -22,10 +23,14 @@ export default function AuthScreen() {
       setError(t('genderRequired'));
       return;
     }
+    if (mode === 'register' && !attestAdult) {
+      setError(t('ageAttestRequired'));
+      return;
+    }
     setBusy(true);
     try {
       if (mode === 'register') {
-        await api.register({ email, password, displayName, gender });
+        await api.register({ email, password, displayName, gender, attestAdult });
         showToast(t('toastRegistered'));
       } else {
         await api.login({ email, password });
@@ -103,6 +108,15 @@ export default function AuthScreen() {
               </div>
               <div className="pt-1.5 text-[11px] leading-5 text-ink-2">{t('genderNote')}</div>
             </div>
+            <label className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={attestAdult}
+                onChange={(e) => setAttestAdult(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-green-dark"
+              />
+              <span className="text-[13px] leading-5 text-ink">{t('ageAttest')}</span>
+            </label>
           </>
         )}
         <label className="block">

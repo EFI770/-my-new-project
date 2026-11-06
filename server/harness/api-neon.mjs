@@ -23,7 +23,8 @@ async function vendorSignup(label) {
   const cookie = setCookie.split(';')[0];
   const t = await fetch(`${AUTH}/token`, { headers: { cookie, origin: 'http://localhost:3000' } });
   const { token: jwt } = await t.json();
-  return { email, password, jwt };
+  const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString('utf8'));
+  return { email, password, jwt, sub: payload.sub };
 }
 
 async function api(method, path, { jwt, body } = {}) {
@@ -74,14 +75,40 @@ ok('N4 expired/forged token 401', ex.status === 401);
 const rg = await api('POST', '/api/auth/register', { jwt: A.jwt, body: { displayName: 'Test A' } });
 ok('N5 register without gender 400', rg.status === 400);
 
+// N5b register without 18+ attestation rejected
+const rg2 = await api('POST', '/api/auth/register', { jwt: A.jwt, body: { displayName: 'Test A', gender: 'man' } });
+ok('N5b register without 18+ attestation 400', rg2.status === 400 && rg2.data?.error === 'age_attestation_required', JSON.stringify(rg2.data));
+
 // N6 register A(man) B(woman) C(man) D(woman)
-const rA = await api('POST', '/api/auth/register', { jwt: A.jwt, body: { displayName: 'אבי אשכנזי', gender: 'man' } });
-const rB = await api('POST', '/api/auth/register', { jwt: B.jwt, body: { displayName: 'ברכה לוי', gender: 'woman' } });
-const rC = await api('POST', '/api/auth/register', { jwt: C.jwt, body: { displayName: 'חיים כהן', gender: 'man' } });
-const rD = await api('POST', '/api/auth/register', { jwt: D.jwt, body: { displayName: 'דבורה מזרחי', gender: 'woman' } });
+const rA = await api('POST', '/api/auth/register', { jwt: A.jwt, body: { displayName: 'אבי אשכנזי', gender: 'man', attestAdult: true } });
+const rB = await api('POST', '/api/auth/register', { jwt: B.jwt, body: { displayName: 'ברכה לוי', gender: 'woman', attestAdult: true } });
+const rC = await api('POST', '/api/auth/register', { jwt: C.jwt, body: { displayName: 'חיים כהן', gender: 'man', attestAdult: true } });
+const rD = await api('POST', '/api/auth/register', { jwt: D.jwt, body: { displayName: 'דבורה מזרחי', gender: 'woman', attestAdult: true } });
 ok('N6 four registrations 201', [rA, rB, rC, rD].every((r) => r.status === 201), JSON.stringify([rA.status, rB.status, rC.status, rD.status]));
-const rA2 = await api('POST', '/api/auth/register', { jwt: A.jwt, body: { displayName: 'אבי אשכנזי', gender: 'man' } });
+const rA2 = await api('POST', '/api/auth/register', { jwt: A.jwt, body: { displayName: 'אבי אשכנזי', gender: 'man', attestAdult: true } });
 ok('N6b re-register same sub 409', rA2.status === 409);
+
+// N6c adults-only gate: fail closed on member APIs until attested (service
+// connection nulls the column to simulate a profile predating attestation)
+if (process.env.DATABASE_ADMIN_URL) {
+  const pg = (await import('pg')).default;
+  const adm = new pg.Client({ connectionString: process.env.DATABASE_ADMIN_URL });
+  await adm.connect();
+  await adm.query('update public.profiles set age_attested_at = null where id = (select id from auth.users where auth_sub = $1)', [A.sub]);
+  let g = await api('GET', '/api/candidates', { jwt: A.jwt });
+  ok('N6c un-attested user blocked from member API (fail closed)', g.status === 403 && g.data?.error === 'age_attestation_required', JSON.stringify(g));
+  g = await api('GET', '/api/me', { jwt: A.jwt });
+  ok('N6d /api/me stays readable while gated', g.status === 200 && g.data?.profile?.age_attested_at === null, JSON.stringify(g.data?.profile));
+  g = await api('POST', '/api/me/attest-age', { jwt: A.jwt, body: {} });
+  ok('N6e attestation without explicit flag 400', g.status === 400 && g.data?.error === 'age_attestation_required');
+  g = await api('POST', '/api/me/attest-age', { jwt: A.jwt, body: { attestAdult: true } });
+  ok('N6f attestation accepted', g.status === 200, JSON.stringify(g));
+  g = await api('GET', '/api/candidates', { jwt: A.jwt });
+  ok('N6g member API open after attestation', g.status === 200, JSON.stringify(g.status));
+  await adm.end();
+} else {
+  ok('N6c age gate DB access for test', false, 'DATABASE_ADMIN_URL not set - gate untested');
+}
 
 // N7 me resolves via auth_sub, own email from token, own gender
 const meA = await api('GET', '/api/me', { jwt: A.jwt });

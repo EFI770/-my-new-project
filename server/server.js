@@ -125,6 +125,7 @@ function rateLimited(key, limit, windowMs) {
 }
 
 const routes = [];
+const AGE_GATE_OPEN = new Set(['GET /api/me', 'POST /api/me/attest-age', 'DELETE /api/me']);
 function route(method, pattern, handler) {
   const keys = [];
   const rx = new RegExp('^' + pattern.replace(/:([^/]+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
@@ -147,6 +148,9 @@ route('POST', '/api/auth/register', async (req, res) => {
     const gender = GENDERS.has(body.gender) ? body.gender : null;
     if (!displayName) return send(res, 400, { error: 'invalid_display_name' });
     if (!gender) return send(res, 400, { error: 'invalid_gender' });
+    // Adults-only pilot: explicit 18+ self-attestation is mandatory. Stored as
+    // a timestamp only - no date of birth or ID is collected.
+    if (body.attestAdult !== true) return send(res, 400, { error: 'age_attestation_required' });
     const created = await db.asService(async (c) => {
       const existing = await c.query('select id from auth.users where auth_sub = $1', [payload.sub]);
       if (existing.rows.length) return null;
@@ -156,7 +160,7 @@ route('POST', '/api/auth/register', async (req, res) => {
     });
     if (!created) return send(res, 409, { error: 'already_registered' });
     await db.withRls(created, (c) => c.query(
-      'insert into public.profiles (id, display_name, gender) values ($1, $2, $3)', [created, displayName, gender]));
+      'insert into public.profiles (id, display_name, gender, age_attested_at) values ($1, $2, $3, now())', [created, displayName, gender]));
     return send(res, 201, { userId: created });
   }
   const body = await readBody(req);
@@ -170,6 +174,9 @@ route('POST', '/api/auth/register', async (req, res) => {
   // Gender is mandatory at signup: learning is same-gender only, and the
   // database fails closed when gender is missing.
   if (!gender) return send(res, 400, { error: 'invalid_gender' });
+  // Adults-only pilot: explicit 18+ self-attestation is mandatory (timestamp
+  // only; no DOB/ID collected).
+  if (body.attestAdult !== true) return send(res, 400, { error: 'age_attestation_required' });
 
   const created = await db.asService(async (c) => {
     const existing = await c.query('select 1 from dev_auth.users where email = $1', [email]);
@@ -184,7 +191,7 @@ route('POST', '/api/auth/register', async (req, res) => {
   if (!created) return send(res, 409, { error: 'email_taken' });
 
   await db.withRls(created, (c) => c.query(
-    'insert into public.profiles (id, display_name, gender) values ($1, $2, $3)', [created, displayName, gender]));
+    'insert into public.profiles (id, display_name, gender, age_attested_at) values ($1, $2, $3, now())', [created, displayName, gender]));
 
   const token = newSessionToken();
   await db.asService((c) => c.query(
@@ -225,11 +232,20 @@ route('POST', '/api/auth/logout', async (req, res) => {
   send(res, 200, { ok: true }, { 'set-cookie': 'dev_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
 });
 
+// ---------- age attestation ----------
+route('POST', '/api/me/attest-age', async (req, res, user) => {
+  const body = await readBody(req);
+  if (body.attestAdult !== true) return send(res, 400, { error: 'age_attestation_required' });
+  await db.withRls(user.id, (c) => c.query(
+    'update public.profiles set age_attested_at = now(), updated_at = now() where id = $1 and age_attested_at is null', [user.id]));
+  send(res, 200, { ok: true });
+});
+
 // ---------- me / profile / contact methods ----------
 route('GET', '/api/me', async (req, res, user) => {
   const data = await db.withRls(user.id, async (c) => {
     const p = await c.query(
-      `select display_name, gender, bio, learning_topics, learning_level, preferred_modes, available_days, availability_notes
+      `select display_name, gender, bio, learning_topics, learning_level, preferred_modes, available_days, availability_notes, age_attested_at
          from public.profiles where id = $1`, [user.id]);
     const m = await c.query(
       'select id, kind, value, is_primary from public.contact_methods where user_id = $1 order by is_primary desc, created_at',
@@ -555,6 +571,16 @@ const server = http.createServer(async (req, res) => {
       const isAuthRoute = url.startsWith('/api/auth/') || url === '/api/health';
       const user = isAuthRoute ? null : await sessionUser(req);
       if (!isAuthRoute && !user) return send(res, 401, { error: 'authentication_required' });
+      // Adults-only gate (fail closed): a profile without an 18+ attestation
+      // can read/delete itself and can attest - nothing else. This also covers
+      // future OAuth-provisioned identities that never passed /api/auth/register.
+      if (!isAuthRoute && !AGE_GATE_OPEN.has(`${r.method} ${url}`)) {
+        const att = await db.asService((c) => c.query(
+          'select age_attested_at from public.profiles where id = $1', [user.id]));
+        if (!att.rows[0] || !att.rows[0].age_attested_at) {
+          return send(res, 403, { error: 'age_attestation_required' });
+        }
+      }
       return await r.handler(req, res, user, params);
     }
     send(res, 404, { error: 'not_found' });

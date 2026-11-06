@@ -39,19 +39,42 @@ check('A2b register without gender rejected', r.status === 400 && r.data?.error 
 r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס', gender: 'other' });
 check('A2c register with invalid gender rejected', r.status === 400 && r.data?.error === 'invalid_gender');
 r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס', gender: 'man' });
-check('A3 alice registers', r.status === 201, JSON.stringify(r));
+check('A2d register without 18+ attestation rejected', r.status === 400 && r.data?.error === 'age_attestation_required', JSON.stringify(r.data));
+r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס', gender: 'man', attestAdult: true });
+check('A3 alice registers (with attestation)', r.status === 201, JSON.stringify(r));
 const aliceId = r.data?.userId;
-r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס', gender: 'man' });
+r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס', gender: 'man', attestAdult: true });
 check('A4 duplicate email rejected', r.status === 409);
-r = await bob.call('POST', '/api/auth/register', { email: 'bob@test.dev', password: pw, displayName: 'בוב', gender: 'man' });
+r = await bob.call('POST', '/api/auth/register', { email: 'bob@test.dev', password: pw, displayName: 'בוב', gender: 'man', attestAdult: true });
 const bobId = r.data?.userId;
-r = await eve.call('POST', '/api/auth/register', { email: 'eve@test.dev', password: pw, displayName: 'איב', gender: 'man' });
+r = await eve.call('POST', '/api/auth/register', { email: 'eve@test.dev', password: pw, displayName: 'איב', gender: 'man', attestAdult: true });
 const eveId = r.data?.userId;
-r = await dana.call('POST', '/api/auth/register', { email: 'dana@test.dev', password: pw, displayName: 'דנה', gender: 'woman' });
+r = await dana.call('POST', '/api/auth/register', { email: 'dana@test.dev', password: pw, displayName: 'דנה', gender: 'woman', attestAdult: true });
 check('A7 dana (woman) registers', r.status === 201, JSON.stringify(r));
 const danaId = r.data?.userId;
 r = await alice.call('GET', '/api/me');
 check('A8 /api/me returns gender', r.data?.profile?.gender === 'man', JSON.stringify(r.data?.profile));
+// --- adults-only gate: fail closed on member APIs until attested ---
+if (process.env.PGHOST && process.env.PGDATABASE) {
+  const pg = (await import('pg')).default;
+  const adm = new pg.Client({ host: process.env.PGHOST, database: process.env.PGDATABASE, user: 'postgres' });
+  await adm.connect();
+  await adm.query('update public.profiles set age_attested_at = null where id = $1', [aliceId]);
+  r = await alice.call('GET', '/api/candidates');
+  check('A3g un-attested user blocked from member API (fail closed)', r.status === 403 && r.data?.error === 'age_attestation_required', JSON.stringify(r));
+  r = await alice.call('GET', '/api/me');
+  check('A3h /api/me stays readable while gated', r.status === 200 && r.data?.profile?.age_attested_at === null, JSON.stringify(r.data?.profile));
+  r = await alice.call('POST', '/api/me/attest-age', {});
+  check('A3i attestation without explicit flag rejected', r.status === 400 && r.data?.error === 'age_attestation_required');
+  r = await alice.call('POST', '/api/me/attest-age', { attestAdult: true });
+  check('A3j attestation accepted', r.status === 200, JSON.stringify(r));
+  r = await alice.call('GET', '/api/candidates');
+  check('A3k member API open after attestation', r.status === 200, JSON.stringify(r.status));
+  await adm.end();
+} else {
+  check('A3g age gate DB access for test', false, 'PGHOST/PGDATABASE not set - gate untested');
+}
+
 const bobLogin = jar();
 r = await bobLogin.call('POST', '/api/auth/login', { email: 'bob@test.dev', password: 'wrong-pass-1' });
 check('A5 wrong password rejected', r.status === 401);
