@@ -61,7 +61,14 @@ function Shell() {
   // Hooks must run unconditionally (before any early return).
   const mainRef = React.useRef(null);
   const tab = TABS.some((tb) => tb.key === route) ? route : 'find';
-  useEffect(() => { if (me) mainRef.current?.focus({ preventScroll: true }); }, [tab, me]);
+  // Move focus to main only on an actual tab change, never on initial load:
+  // focusing main on load would defeat the skip link as first tab stop.
+  const prevTab = React.useRef(null);
+  useEffect(() => {
+    if (!me) return;
+    if (prevTab.current !== null && prevTab.current !== tab) mainRef.current?.focus({ preventScroll: true });
+    prevTab.current = tab;
+  }, [tab, me]);
 
   if (me === undefined) {
     return <div role="status" className="min-h-screen grid place-items-center text-ink-2">{t('loading')}</div>;

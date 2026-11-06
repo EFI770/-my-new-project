@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { errText, useLang, useLabels } from '../i18n.jsx';
 import { useApp, LangSwitch } from '../App.jsx';
@@ -14,6 +14,10 @@ export default function AuthScreen() {
   const [gender, setGender] = useState('');
   const [attestAdult, setAttestAdult] = useState(false);
   const [error, setError] = useState(null);
+  // Google sign-in for app users (owner decision): rendered only when the
+  // server reports the vendor provider configured. Disabled by default.
+  const [providers, setProviders] = useState(null);
+  useEffect(() => { api.providers().then(setProviders).catch(() => {}); }, []);
   const [busy, setBusy] = useState(false);
 
   async function submit(e) {
@@ -152,6 +156,16 @@ export default function AuthScreen() {
           {busy ? t('busy') : mode === 'register' ? t('register') : t('login')}
         </button>
       </form>
+      {providers?.google?.enabled && providers.google.authUrl && (
+        <div className="pt-4">
+          <a
+            href={`${providers.google.authUrl}/sign-in/social?provider=google&callbackURL=${encodeURIComponent(window.location.origin + '/#/auth')}`}
+            className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[15px] font-semibold text-ink"
+          >
+            {t('continueWithGoogle')}
+          </a>
+        </div>
+      )}
     </div>
   );
 }

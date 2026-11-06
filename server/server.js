@@ -232,6 +232,23 @@ route('POST', '/api/auth/logout', async (req, res) => {
   send(res, 200, { ok: true }, { 'set-cookie': 'dev_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
 });
 
+// ---------- OAuth provider discovery (code prep; vendor config pending) ----------
+// Google sign-in for APP END-USERS (user decision 2026-11-06 11:59, wamid
+// HBgMOTcyNTI3NzA3NDQxFQIAEhgUM0FEQjAyM0NFQTk1...E2RjZENTkwMjhBRTk4MTUwMjgA).
+// Neon Auth (managed Better Auth) owns the actual OAuth dance; the console-side
+// provider setup is blocked on console.neon.com access, so this ships disabled
+// by default: the client only renders a Google button when enabled AND an auth
+// base URL is configured. No tokens or secrets here - the base URL is public.
+route('GET', '/api/auth/providers', async (req, res) => {
+  send(res, 200, {
+    email: { enabled: true },
+    google: {
+      enabled: process.env.GOOGLE_SIGNIN_ENABLED === 'true' && !!process.env.NEON_AUTH_URL,
+      authUrl: process.env.NEON_AUTH_URL || null,
+    },
+  });
+});
+
 // ---------- age attestation ----------
 route('POST', '/api/me/attest-age', async (req, res, user) => {
   const body = await readBody(req);

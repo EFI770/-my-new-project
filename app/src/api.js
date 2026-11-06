@@ -19,6 +19,7 @@ async function call(method, path, body) {
 }
 
 export const api = {
+  providers: () => call('GET', '/api/auth/providers'),
   register: (b) => call('POST', '/api/auth/register', b),
   login: (b) => call('POST', '/api/auth/login', b),
   logout: () => call('POST', '/api/auth/logout'),
