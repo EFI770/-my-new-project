@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from './api.js';
+import { LangProvider, useLang } from './i18n.jsx';
 import Landing from './screens/Landing.jsx';
 import AuthScreen from './screens/Auth.jsx';
 import Candidates from './screens/Candidates.jsx';
@@ -9,13 +10,6 @@ import Profile from './screens/Profile.jsx';
 
 const AppCtx = createContext(null);
 export function useApp() { return useContext(AppCtx); }
-
-const TABS = [
-  { key: 'find', label: 'מציאת חברותא' },
-  { key: 'requests', label: 'בקשות לימוד' },
-  { key: 'connections', label: 'חיבורים' },
-  { key: 'me', label: 'אזור אישי' },
-];
 
 function useHashRoute() {
   const [hash, setHash] = useState(() => window.location.hash.replace(/^#\/?/, '') || '');
@@ -28,10 +22,31 @@ function useHashRoute() {
   return [hash, navigate];
 }
 
-export default function App() {
+export function LangSwitch() {
+  const { lang, setLang } = useLang();
+  return (
+    <button
+      onClick={() => setLang(lang === 'he' ? 'en' : 'he')}
+      className="rounded-full border border-[#e7e5e4] bg-white px-3 py-1.5 text-[12px] font-medium text-ink-2"
+      aria-label="Switch language / החלפת שפה"
+    >
+      {lang === 'he' ? 'EN' : 'עב'}
+    </button>
+  );
+}
+
+function Shell() {
   const [route, navigate] = useHashRoute();
   const [me, setMe] = useState(undefined); // undefined=loading, null=logged out
   const [toast, setToast] = useState(null);
+  const { t } = useLang();
+
+  const TABS = [
+    { key: 'find', label: t('tabFind') },
+    { key: 'requests', label: t('tabRequests') },
+    { key: 'connections', label: t('tabConnections') },
+    { key: 'me', label: t('tabMe') },
+  ];
 
   const refreshMe = useCallback(async () => {
     try { setMe(await api.me()); } catch { setMe(null); }
@@ -44,7 +59,7 @@ export default function App() {
   }, []);
 
   if (me === undefined) {
-    return <div className="min-h-screen grid place-items-center text-ink-2">טוען…</div>;
+    return <div className="min-h-screen grid place-items-center text-ink-2">{t('loading')}</div>;
   }
 
   const ctx = { me, refreshMe, showToast, navigate };
@@ -58,16 +73,19 @@ export default function App() {
     );
   }
 
-  const tab = TABS.some((t) => t.key === route) ? route : 'find';
+  const tab = TABS.some((tb) => tb.key === route) ? route : 'find';
   return (
     <AppCtx.Provider value={ctx}>
       <div className="mx-auto min-h-screen max-w-[920px] pb-24">
         <header className="flex items-center justify-between px-5 pt-5">
           <div>
-            <div className="text-[20px] font-bold text-green-dark">חברותא</div>
-            <div className="text-[12px] text-ink-2">רתמים • פיילוט קהילתי</div>
+            <div className="text-[20px] font-bold text-green-dark">{t('brand')}</div>
+            <div className="text-[12px] text-ink-2">{t('tagline')}</div>
           </div>
-          <div className="text-[13px] text-ink-2">שלום, {me.profile?.displayName || 'לומד'}</div>
+          <div className="flex items-center gap-3">
+            <div className="text-[13px] text-ink-2">{t('greeting', { name: me.profile?.displayName || t('fallbackName') })}</div>
+            <LangSwitch />
+          </div>
         </header>
         <main className="px-5 pt-5">
           {tab === 'find' && <Candidates />}
@@ -77,13 +95,13 @@ export default function App() {
         </main>
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e7e5e4] bg-white/90 backdrop-blur">
           <div className="mx-auto grid max-w-[920px] grid-cols-4">
-            {TABS.map((t) => (
+            {TABS.map((tb) => (
               <button
-                key={t.key}
-                onClick={() => navigate(t.key)}
-                className={`py-3 text-[13px] ${tab === t.key ? 'font-semibold text-green-dark' : 'text-ink-2'}`}
+                key={tb.key}
+                onClick={() => navigate(tb.key)}
+                className={`py-3 text-[13px] ${tab === tb.key ? 'font-semibold text-green-dark' : 'text-ink-2'}`}
               >
-                {t.label}
+                {tb.label}
               </button>
             ))}
           </div>
@@ -91,6 +109,14 @@ export default function App() {
       </div>
       {toast && <Toast text={toast} />}
     </AppCtx.Provider>
+  );
+}
+
+export default function App() {
+  return (
+    <LangProvider>
+      <Shell />
+    </LangProvider>
   );
 }
 

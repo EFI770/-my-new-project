@@ -6,8 +6,8 @@ import puppeteer from 'puppeteer-core';
 const BASE = process.env.BASE || 'http://127.0.0.1:4173';
 const SHOT_DIR = '/downloads';
 const ts = Date.now().toString(36);
-const A = { email: `a-${ts}@test.dev`, name: 'דוד לוי' };
-const B = { email: `b-${ts}@test.dev`, name: 'שרה כהן' };
+const A = { email: `a-${ts}@test.dev`, name: `דבורה לוי ${ts}` };
+const B = { email: `b-${ts}@test.dev`, name: `שרה כהן ${ts}` };
 const PW = 'visual-pass-123';
 let pass = 0, fail = 0;
 const check = (n, c, extra = '') => { if (c) { console.log(`ok - ${n}`); pass++; } else { console.log(`FAIL - ${n} ${extra}`); fail++; } };
@@ -24,7 +24,7 @@ async function apiCall(method, path, body, cookie) {
 }
 
 // Seed user B via API (profile + contact + interest in A happens later)
-let r = await apiCall('POST', '/api/auth/register', { email: B.email, password: PW, displayName: B.name });
+let r = await apiCall('POST', '/api/auth/register', { email: B.email, password: PW, displayName: B.name, gender: 'woman' });
 const bCookie = r.cookie; const bId = r.data?.userId;
 await apiCall('PUT', '/api/me/profile', {
   displayName: B.name, bio: 'מחפשת חברותא נעימה לפרשת שבוע', learningTopics: ['פרשת שבוע', 'גמרא'],
@@ -46,7 +46,7 @@ check('V1 landing hero visible', await page.$eval('h1', (e) => e.textContent.inc
 await page.screenshot({ path: `${SHOT_DIR}/rebuild-01-landing.png` });
 
 // 2. register via UI
-await page.click('header button');
+await page.evaluate(() => [...document.querySelectorAll('header button')].find((b) => b.textContent.includes('התחברות'))?.click());
 await page.waitForSelector('form');
 check('V2 auth screen opened', true);
 await page.screenshot({ path: `${SHOT_DIR}/rebuild-02-auth.png` });
@@ -57,6 +57,8 @@ await page.evaluate(() => {
 });
 await page.waitForSelector('input[placeholder="למשל: יעקב כהן"]');
 await page.type('input[placeholder="למשל: יעקב כהן"]', A.name);
+await page.evaluate(() => [...document.querySelectorAll('form button[type="button"]')].find((b) => b.textContent.trim() === 'אישה')?.click());
+check('V2b gender selected in UI', await page.evaluate(() => [...document.querySelectorAll('form button[type="button"]')].some((b) => b.textContent.trim() === 'אישה' && b.getAttribute('aria-pressed') === 'true')));
 const inputs = await page.$$('form input');
 await inputs[1].type(A.email);
 await inputs[2].type(PW);
@@ -129,6 +131,16 @@ await page.screenshot({ path: `${SHOT_DIR}/rebuild-07-contact.png`, fullPage: tr
 // 8. RTL + direction sanity
 const dir = await page.evaluate(() => document.documentElement.dir);
 check('V10 document is RTL', dir === 'rtl');
+
+// 9. language switch: Hebrew -> English -> Hebrew
+await page.evaluate(() => document.querySelector('button[aria-label*="Switch language"]')?.click());
+await new Promise((r) => setTimeout(r, 500));
+check('V11a English switches direction to LTR', await page.evaluate(() => document.documentElement.dir === 'ltr' && document.documentElement.lang === 'en'));
+check('V11b English UI strings render', await page.evaluate(() => document.body.textContent.includes('Connections')));
+await page.screenshot({ path: `${SHOT_DIR}/rebuild-08-english.png` });
+await page.evaluate(() => document.querySelector('button[aria-label*="Switch language"]')?.click());
+await new Promise((r) => setTimeout(r, 500));
+check('V12 switching back restores RTL Hebrew', await page.evaluate(() => document.documentElement.dir === 'rtl' && document.body.textContent.includes('חיבורים')));
 
 await browser.close();
 console.log(`PASS=${pass} FAIL=${fail}`);

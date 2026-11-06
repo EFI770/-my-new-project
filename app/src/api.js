@@ -44,18 +44,3 @@ export const api = {
   report: (b) => call('POST', '/api/reports', b),
 };
 
-export const ERROR_HE = {
-  invalid_email: 'אימייל לא תקין',
-  password_too_short: 'הסיסמה קצרה מדי (לפחות 8 תווים)',
-  invalid_display_name: 'יש להזין שם תצוגה',
-  email_taken: 'משתמש עם אימייל זה כבר קיים',
-  invalid_credentials: 'אימייל או סיסמה שגויים',
-  authentication_required: 'יש להתחבר כדי להמשיך',
-  not_permitted: 'הפעולה לא אפשרית',
-  conflict: 'כבר קיימת בקשה פעילה מול משתמש זה',
-  invalid_input: 'קלט לא תקין',
-  internal_error: 'שגיאה בשרת, נסו שוב',
-};
-export function heError(err) {
-  return ERROR_HE[err?.code] || 'משהו השתבש, נסו שוב';
-}

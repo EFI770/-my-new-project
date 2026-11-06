@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { api, heError } from '../api.js';
+import { api } from '../api.js';
+import { errText, useLang, useLabels, TOPICS } from '../i18n.jsx';
 import { useApp } from '../App.jsx';
-import { TOPICS, LEVELS, MODES, DAYS } from '../labels.js';
 import Matches from './Matches.jsx';
 
 export default function Candidates() {
   const { me, showToast } = useApp();
+  const { t } = useLang();
+  const labels = useLabels();
   const [sub, setSub] = useState('find'); // find | matches
   const [candidates, setCandidates] = useState(null);
   const [topicFilter, setTopicFilter] = useState('');
@@ -15,7 +17,7 @@ export default function Candidates() {
     try {
       const { candidates } = await api.candidates();
       setCandidates(candidates);
-    } catch (err) { setError(heError(err)); }
+    } catch (err) { setError(errText(t, err)); }
   }
   useEffect(() => { load(); }, []);
 
@@ -23,7 +25,7 @@ export default function Candidates() {
   const ranked = useMemo(() => {
     if (!candidates) return [];
     const score = (c) =>
-      (c.learningTopics || []).filter((t) => myTopics.includes(t)).length * 3 +
+      (c.learningTopics || []).filter((x) => myTopics.includes(x)).length * 3 +
       (c.learningLevel && c.learningLevel === me.profile?.learning_level ? 2 : 0) +
       (c.availableDays || []).filter((d) => (me.profile?.available_days || []).includes(d)).length;
     return [...candidates]
@@ -36,17 +38,17 @@ export default function Candidates() {
     setCandidates((cs) => cs.map((x) => (x.id === c.id ? { ...x, myInterest: next } : x)));
     try {
       await api.setInterest(c.id, next);
-      showToast(next ? 'הבחירה נשמרה בפרטיות' : 'הבחירה בוטלה');
+      showToast(next ? t('toastSelected') : t('toastUnselected'));
     } catch (err) {
       setCandidates((cs) => cs.map((x) => (x.id === c.id ? { ...x, myInterest: c.myInterest } : x)));
-      showToast(heError(err));
+      showToast(errText(t, err));
     }
   }
 
   return (
     <div>
       <div className="grid grid-cols-2 rounded-full bg-cream-2 p-1">
-        {[['find', 'מועמדים'], ['matches', 'התאמות']].map(([k, label]) => (
+        {[['find', t('subCandidates')], ['matches', t('subMatches')]].map(([k, label]) => (
           <button
             key={k}
             onClick={() => setSub(k)}
@@ -60,47 +62,46 @@ export default function Candidates() {
       {sub === 'matches' ? <Matches /> : (
         <div className="pt-5">
           <div className="rounded-[14px] bg-[#f0fdf4] px-4 py-3 text-[12px] leading-5 text-ink-2">
-            הבחירה שלך פרטית לחלוטין: אף אחד לא רואה מי בחר בו. התאמה מוצגת רק כששני
-            הצדדים בחרו זה בזה.
+            {t('privacyBanner')}
           </div>
           <div className="flex gap-2 overflow-x-auto py-4">
             <button
               onClick={() => setTopicFilter('')}
               className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] ${!topicFilter ? 'border-green-dark bg-green-dark text-white' : 'border-[#e7e5e4] bg-white text-ink-2'}`}
             >
-              הכל
+              {t('all')}
             </button>
-            {TOPICS.map((t) => (
+            {TOPICS.map((topic) => (
               <button
-                key={t}
-                onClick={() => setTopicFilter(t === topicFilter ? '' : t)}
-                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] ${topicFilter === t ? 'border-green-dark bg-green-dark text-white' : 'border-[#e7e5e4] bg-white text-ink-2'}`}
+                key={topic}
+                onClick={() => setTopicFilter(topic === topicFilter ? '' : topic)}
+                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[13px] ${topicFilter === topic ? 'border-green-dark bg-green-dark text-white' : 'border-[#e7e5e4] bg-white text-ink-2'}`}
               >
-                {t}
+                {labels.topic(topic)}
               </button>
             ))}
           </div>
           {error && <div className="text-[13px] text-danger">{error}</div>}
-          {candidates === null && <div className="text-ink-2">טוען…</div>}
+          {candidates === null && <div className="text-ink-2">{t('loading')}</div>}
           {candidates !== null && ranked.length === 0 && (
-            <div className="pt-8 text-center text-[14px] text-ink-2">אין מועמדים להצגה כרגע.</div>
+            <div className="pt-8 text-center text-[14px] text-ink-2">{t('noCandidates')}</div>
           )}
           <div className="grid gap-4 md:grid-cols-2">
             {ranked.map((c) => (
               <div key={c.id} className="rounded-[20px] border border-[#f5f5f4] bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="text-[16px] font-semibold text-green-dark">{c.displayName}</div>
-                  {c.learningLevel && <span className="rounded-full bg-cream-2 px-2.5 py-1 text-[11px] text-ink-2">{LEVELS[c.learningLevel]}</span>}
+                  {c.learningLevel && <span className="rounded-full bg-cream-2 px-2.5 py-1 text-[11px] text-ink-2">{labels.level(c.learningLevel)}</span>}
                 </div>
                 {c.bio && <div className="pt-1.5 text-[13px] leading-6 text-ink-2">{c.bio}</div>}
                 <div className="flex flex-wrap gap-1.5 pt-3">
-                  {(c.learningTopics || []).map((t) => (
-                    <span key={t} className="rounded-full bg-[#f0fdf4] px-2.5 py-1 text-[11px] text-green-dark">{t}</span>
+                  {(c.learningTopics || []).map((topic) => (
+                    <span key={topic} className="rounded-full bg-[#f0fdf4] px-2.5 py-1 text-[11px] text-green-dark">{labels.topic(topic)}</span>
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 pt-3 text-[12px] text-ink-2">
-                  {(c.preferredModes || []).length > 0 && <span>{c.preferredModes.map((m) => MODES[m]).join(' • ')}</span>}
-                  {(c.availableDays || []).length > 0 && <span>ימים: {c.availableDays.map((d) => DAYS[d]).join(' ')}</span>}
+                  {(c.preferredModes || []).length > 0 && <span>{c.preferredModes.map((m) => labels.mode(m)).join(' • ')}</span>}
+                  {(c.availableDays || []).length > 0 && <span>{t('daysPrefix')} {c.availableDays.map((d) => labels.day(d)).join(' ')}</span>}
                 </div>
                 <button
                   onClick={() => toggleInterest(c)}
@@ -110,7 +111,7 @@ export default function Candidates() {
                       : 'bg-green-dark text-white'
                   }`}
                 >
-                  {c.myInterest === true ? '✓ נבחר (פרטי)' : 'מעוניין בחברותא'}
+                  {c.myInterest === true ? t('interestedDone') : t('interested')}
                 </button>
               </div>
             ))}

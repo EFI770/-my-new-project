@@ -31,7 +31,7 @@ $$;
 grant usage on schema public to anon, authenticated;
 grant usage on schema auth to anon, authenticated;
 SQL
-for f in supabase/migrations/0001_initial_schema.sql supabase/migrations/0002_contact_consent_and_blocks.sql supabase/migrations/0003_private_interests_and_contact_disclosure.sql; do
+for f in supabase/migrations/0001_initial_schema.sql supabase/migrations/0002_contact_consent_and_blocks.sql supabase/migrations/0003_private_interests_and_contact_disclosure.sql supabase/migrations/0004_gender_separation.sql; do
   psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f "$f"
 done
 
@@ -44,8 +44,8 @@ pass=0; fail=0
 check() { if echo "$3" | grep -qF "$2"; then echo "ok - $1"; pass=$((pass+1));
   else echo "FAIL - $1"; echo "  expected: $2"; echo "  got: $3"; fail=$((fail+1)); fi; }
 
-run_as alice "$ALICE" "insert into public.profiles (id, display_name) values ('$ALICE','Alice');" >/dev/null
-run_as bob "$BOB" "insert into public.profiles (id, display_name) values ('$BOB','Bob');" >/dev/null
+run_as alice "$ALICE" "insert into public.profiles (id, display_name, gender) values ('$ALICE','Alice','man');" >/dev/null
+run_as bob "$BOB" "insert into public.profiles (id, display_name, gender) values ('$BOB','Bob','man');" >/dev/null
 
 # U1: one-sided interest is invisible to the other side
 run_as alice "$ALICE" "insert into public.interest_selections (viewer_id, candidate_id, interested) values ('$ALICE','$BOB',true);" >/dev/null

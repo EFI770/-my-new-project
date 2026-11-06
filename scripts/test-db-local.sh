@@ -40,6 +40,8 @@ SQL
 
 psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f supabase/migrations/0001_initial_schema.sql
 psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f supabase/migrations/0002_contact_consent_and_blocks.sql
+psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f supabase/migrations/0003_private_interests_and_contact_disclosure.sql
+psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f supabase/migrations/0004_gender_separation.sql
 
 ALICE=11111111-1111-1111-1111-111111111111
 BOB=22222222-2222-2222-2222-222222222222
@@ -55,8 +57,10 @@ check() { # name, expected_substr, actual
 }
 
 # T1: alice creates her profile
-out=$(run_as alice "$ALICE" "insert into public.profiles (id, display_name) values ('$ALICE', 'Alice') returning id;")
+out=$(run_as alice "$ALICE" "insert into public.profiles (id, display_name, gender) values ('$ALICE', 'Alice', 'man') returning id;")
 check "T1 alice creates own profile" "$ALICE" "$out"
+# T1b: bob creates his profile (same gender -> mutual visibility)
+run_as bob "$BOB" "insert into public.profiles (id, display_name, gender) values ('$BOB','Bob','man');" >/dev/null
 # T2: bob can read alice's profile before any block
 out=$(run_as bob "$BOB" "select count(*) from public.profiles where id = '$ALICE';")
 check "T2 bob reads alice profile pre-block" "1" "$out"
@@ -82,7 +86,7 @@ check "T6c requester cannot accept own request" "Request not found or action not
 run_as alice "$ALICE" "insert into public.user_blocks (blocker_id, blocked_id) values ('$ALICE','$BOB');" >/dev/null
 out=$(run_as bob "$BOB" "select count(*) from public.profiles where id = '$ALICE';")
 check "T7a blocked user cannot see blocker profile" "0" "$out"
-run_as bob "$BOB" "insert into public.profiles (id, display_name) values ('$BOB','Bob') on conflict do nothing;" >/dev/null
+
 out=$(run_as alice "$ALICE" "select count(*) from public.profiles where id = '$BOB';")
 check "T7b blocker cannot see blocked profile" "0" "$out"
 # T8: no new connection requests in either direction while blocked

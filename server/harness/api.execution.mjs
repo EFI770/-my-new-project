@@ -26,7 +26,7 @@ function jar() {
   };
 }
 
-const alice = jar(), bob = jar(), eve = jar(), anon = jar();
+const alice = jar(), bob = jar(), eve = jar(), dana = jar(), anon = jar();
 const pw = 'test-pass-1234';
 
 // --- auth ---
@@ -35,14 +35,23 @@ check('A1 unauthenticated /api/me -> 401', r.status === 401);
 r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: 'short', displayName: 'אליס' });
 check('A2 short password rejected', r.status === 400);
 r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס' });
+check('A2b register without gender rejected', r.status === 400 && r.data?.error === 'invalid_gender', JSON.stringify(r.data));
+r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס', gender: 'other' });
+check('A2c register with invalid gender rejected', r.status === 400 && r.data?.error === 'invalid_gender');
+r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס', gender: 'man' });
 check('A3 alice registers', r.status === 201, JSON.stringify(r));
 const aliceId = r.data?.userId;
-r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס' });
+r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס', gender: 'man' });
 check('A4 duplicate email rejected', r.status === 409);
-r = await bob.call('POST', '/api/auth/register', { email: 'bob@test.dev', password: pw, displayName: 'בוב' });
+r = await bob.call('POST', '/api/auth/register', { email: 'bob@test.dev', password: pw, displayName: 'בוב', gender: 'man' });
 const bobId = r.data?.userId;
-r = await eve.call('POST', '/api/auth/register', { email: 'eve@test.dev', password: pw, displayName: 'איב' });
+r = await eve.call('POST', '/api/auth/register', { email: 'eve@test.dev', password: pw, displayName: 'איב', gender: 'man' });
 const eveId = r.data?.userId;
+r = await dana.call('POST', '/api/auth/register', { email: 'dana@test.dev', password: pw, displayName: 'דנה', gender: 'woman' });
+check('A7 dana (woman) registers', r.status === 201, JSON.stringify(r));
+const danaId = r.data?.userId;
+r = await alice.call('GET', '/api/me');
+check('A8 /api/me returns gender', r.data?.profile?.gender === 'man', JSON.stringify(r.data?.profile));
 const bobLogin = jar();
 r = await bobLogin.call('POST', '/api/auth/login', { email: 'bob@test.dev', password: 'wrong-pass-1' });
 check('A5 wrong password rejected', r.status === 401);
@@ -69,6 +78,11 @@ r = await eve.call('PUT', '/api/me/profile', {
   preferredModes: ['phone'], availableDays: ['wed'], availabilityNotes: '',
 });
 check('P5 eve updates profile', r.status === 200);
+r = await dana.call('PUT', '/api/me/profile', {
+  displayName: 'דנה', bio: '', learningTopics: ['משנה'], learningLevel: 'beginner',
+  preferredModes: ['in_person'], availableDays: ['sun'], availabilityNotes: '',
+});
+check('P6 dana updates profile', r.status === 200);
 
 // --- candidates: allowlisted fields only, no contact data ---
 r = await alice.call('GET', '/api/candidates');
@@ -150,6 +164,47 @@ r = await alice.call('DELETE', `/api/blocks/${eveId}`);
 check('B6 unblock works', r.status === 200);
 r = await eve.call('GET', '/api/candidates');
 check('B7 eve sees alice again after unblock', r.data.candidates.some((c) => c.id === aliceId));
+
+// --- gender separation: enforced server-side, fail-closed ---
+r = await dana.call('GET', '/api/candidates');
+check('GS1 dana sees no men as candidates', r.status === 200 && r.data.candidates.length === 0, JSON.stringify(r.data.candidates?.length));
+r = await alice.call('GET', '/api/candidates');
+check('GS2 alice does not see dana', !r.data.candidates.some((c) => c.id === danaId));
+r = await dana.call('POST', '/api/interests', { candidateId: aliceId, interested: true });
+check('GS3 cross-gender interest rejected', r.status === 403, JSON.stringify(r));
+r = await alice.call('POST', '/api/connections', { recipientId: danaId, message: 'hi' });
+check('GS4 cross-gender connection rejected', r.status === 403, JSON.stringify(r));
+r = await dana.call('POST', '/api/study-requests', { title: 'משנה בבוקר', topic: 'משנה', description: '', learningLevel: 'beginner', preferredModes: ['in_person'], availableDays: ['sun'] });
+check('GS5a dana creates study request', r.status === 201);
+const danaSrId = r.data?.id;
+r = await alice.call('GET', '/api/study-requests');
+check('GS5b cross-gender study request hidden', !r.data.studyRequests.some((x) => x.id === danaSrId));
+r = await dana.call('GET', '/api/study-requests');
+check('GS5c dana sees own request but no men requests', r.data.studyRequests.some((x) => x.id === danaSrId) && !r.data.studyRequests.some((x) => x.id === srId));
+r = await bob.call('PUT', '/api/me/profile', { displayName: 'בוב', bio: 'x', learningTopics: [], learningLevel: null, preferredModes: [], availableDays: [], availabilityNotes: '', gender: 'other' });
+check('GS6 invalid gender change rejected', r.status === 400 && r.data?.error === 'invalid_gender');
+// bob becomes 'woman': the accepted alice<->bob connection and the mutual match must die
+r = await bob.call('PUT', '/api/me/profile', { displayName: 'בוב', bio: 'לומד גמרא', learningTopics: ['גמרא'], learningLevel: 'intermediate', preferredModes: ['video'], availableDays: ['sun', 'tue'], availabilityNotes: '', gender: 'woman' });
+check('GS7 bob changes gender', r.status === 200, JSON.stringify(r.data));
+r = await alice.call('GET', '/api/matches');
+check('GS8 match with bob severed after change', r.data.matches.length === 0);
+r = await alice.call('GET', `/api/connections/${connId}/contact`);
+check('GS9 contact denied after gender change', r.status === 403);
+r = await alice.call('GET', '/api/connections');
+check('GS10 connection shows cancelled', r.data.connections.find((c) => c.id === connId)?.status === 'cancelled', JSON.stringify(r.data.connections));
+r = await alice.call('GET', '/api/candidates');
+check('GS11 alice no longer sees bob', !r.data.candidates.some((c) => c.id === bobId));
+check('GS12 alice interest state on bob wiped', r.data.candidates.find((c) => c.id === bobId) === undefined);
+r = await bob.call('GET', '/api/candidates');
+check('GS13 bob now sees dana, not alice', r.data.candidates.some((c) => c.id === danaId) && !r.data.candidates.some((c) => c.id === aliceId));
+r = await bob.call('POST', '/api/interests', { candidateId: danaId, interested: true });
+check('GS14 bob (now woman) can select dana', r.status === 200);
+r = await bob.call('PUT', '/api/me/profile', { displayName: 'בוב', bio: 'לומד גמרא', learningTopics: ['גמרא'], learningLevel: 'intermediate', preferredModes: ['video'], availableDays: ['sun', 'tue'], availabilityNotes: '', gender: 'man' });
+check('GS15 bob changes back to man', r.status === 200);
+r = await bob.call('GET', '/api/candidates');
+check('GS16 change-back severed bob-dana selection', !r.data.candidates.some((c) => c.id === danaId));
+r = await alice.call('GET', `/api/connections/${connId}/contact`);
+check('GS17 cancelled connection stays cancelled after change-back', r.status === 403);
 
 // --- reports ---
 r = await eve.call('POST', '/api/reports', { reportedUserId: bobId, reason: 'התנהגות פוגענית', details: 'פרטים' });

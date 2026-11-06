@@ -1,32 +1,40 @@
 import React, { useState } from 'react';
-import { api, heError } from '../api.js';
-import { useApp } from '../App.jsx';
+import { api } from '../api.js';
+import { errText, useLang, useLabels } from '../i18n.jsx';
+import { useApp, LangSwitch } from '../App.jsx';
 
 export default function AuthScreen() {
   const { refreshMe, showToast, navigate } = useApp();
+  const { t } = useLang();
+  const labels = useLabels();
   const [mode, setMode] = useState('login'); // login | register
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [gender, setGender] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
   async function submit(e) {
     e.preventDefault();
     setError(null);
+    if (mode === 'register' && !gender) {
+      setError(t('genderRequired'));
+      return;
+    }
     setBusy(true);
     try {
       if (mode === 'register') {
-        await api.register({ email, password, displayName });
-        showToast('נרשמת בהצלחה! השלם את פרופיל הלימוד');
+        await api.register({ email, password, displayName, gender });
+        showToast(t('toastRegistered'));
       } else {
         await api.login({ email, password });
-        showToast('ברוך הבא');
+        showToast(t('toastWelcome'));
       }
       await refreshMe();
       navigate('find');
     } catch (err) {
-      setError(heError(err));
+      setError(errText(t, err));
     } finally {
       setBusy(false);
     }
@@ -35,18 +43,20 @@ export default function AuthScreen() {
   return (
     <div className="mx-auto min-h-screen max-w-[380px] px-5">
       <header className="pt-5">
-        <button onClick={() => navigate('')} className="text-[13px] text-ink-2">← חזרה</button>
-        <div className="pt-4 text-[20px] font-bold text-green-dark">חברותא</div>
-        <div className="text-[13px] text-ink-2">הצטרפות לקהילת הלומדים ברתמים</div>
+        <div className="flex items-center justify-between">
+          <button onClick={() => navigate('')} className="text-[13px] text-ink-2">{t('back')}</button>
+          <LangSwitch />
+        </div>
+        <div className="pt-4 text-[20px] font-bold text-green-dark">{t('brand')}</div>
+        <div className="text-[13px] text-ink-2">{t('authSubtitle')}</div>
       </header>
 
       <div className="pt-5 text-[12px] leading-6 text-ink-2">
-        המערכת שומרת על פרטיותך: פרטי קשר נחשפים רק לאחר אישור הדדי.
-        מבוגרים בלבד בפיילוט.
+        {t('authPrivacy')}
       </div>
 
       <div className="mt-5 grid grid-cols-2 rounded-full bg-cream-2 p-1">
-        {[['login', 'התחברות'], ['register', 'הרשמה']].map(([k, label]) => (
+        {[['login', t('login')], ['register', t('register')]].map(([k, label]) => (
           <button
             key={k}
             onClick={() => { setMode(k); setError(null); }}
@@ -59,20 +69,43 @@ export default function AuthScreen() {
 
       <form onSubmit={submit} className="space-y-4 pt-6">
         {mode === 'register' && (
-          <label className="block">
-            <span className="text-[13px] font-medium text-ink">שם תצוגה</span>
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="למשל: יעקב כהן"
-              className="mt-1 w-full rounded-xl border border-[#e7e5e4] bg-white px-4 py-3 text-[15px]"
-              required
-              maxLength={80}
-            />
-          </label>
+          <>
+            <label className="block">
+              <span className="text-[13px] font-medium text-ink">{t('displayName')}</span>
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder={t('displayNamePlaceholder')}
+                className="mt-1 w-full rounded-xl border border-[#e7e5e4] bg-white px-4 py-3 text-[15px]"
+                required
+                maxLength={80}
+              />
+            </label>
+            <div>
+              <span className="text-[13px] font-medium text-ink">{t('genderLabel')}</span>
+              <div className="grid grid-cols-2 gap-2 pt-1.5">
+                {['man', 'woman'].map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGender(g)}
+                    aria-pressed={gender === g}
+                    className={`rounded-xl border py-3 text-[15px] font-medium ${
+                      gender === g
+                        ? 'border-green-dark bg-green-dark text-white'
+                        : 'border-[#e7e5e4] bg-white text-ink'
+                    }`}
+                  >
+                    {labels.gender(g)}
+                  </button>
+                ))}
+              </div>
+              <div className="pt-1.5 text-[11px] leading-5 text-ink-2">{t('genderNote')}</div>
+            </div>
+          </>
         )}
         <label className="block">
-          <span className="text-[13px] font-medium text-ink">אימייל</span>
+          <span className="text-[13px] font-medium text-ink">{t('email')}</span>
           <input
             type="email"
             dir="ltr"
@@ -83,7 +116,7 @@ export default function AuthScreen() {
           />
         </label>
         <label className="block">
-          <span className="text-[13px] font-medium text-ink">סיסמה</span>
+          <span className="text-[13px] font-medium text-ink">{t('password')}</span>
           <input
             type="password"
             dir="ltr"
@@ -93,7 +126,7 @@ export default function AuthScreen() {
             required
             minLength={mode === 'register' ? 8 : 1}
           />
-          {mode === 'register' && <span className="text-[11px] text-ink-2">לפחות 8 תווים</span>}
+          {mode === 'register' && <span className="text-[11px] text-ink-2">{t('passwordHint')}</span>}
         </label>
         {error && <div className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] text-[#991b1b]">{error}</div>}
         <button
@@ -101,7 +134,7 @@ export default function AuthScreen() {
           disabled={busy}
           className="w-full rounded-full bg-green-dark py-3 text-[15px] font-semibold text-white disabled:opacity-60"
         >
-          {busy ? 'רגע…' : mode === 'register' ? 'הרשמה' : 'התחברות'}
+          {busy ? t('busy') : mode === 'register' ? t('register') : t('login')}
         </button>
       </form>
     </div>

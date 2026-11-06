@@ -21,6 +21,7 @@ const db = createDb({ socketDir: SOCKET_DIR, database: DATABASE });
 const JSON_LIMIT = 64 * 1024;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CONTACT_KINDS = new Set(['phone', 'email', 'whatsapp', 'telegram']);
+const GENDERS = new Set(['man', 'woman']);
 const LEVELS = new Set(['beginner', 'intermediate', 'advanced']);
 const MODES = new Set(['in_person', 'phone', 'video']);
 const DAYS = new Set(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']);
@@ -113,9 +114,13 @@ route('POST', '/api/auth/register', async (req, res) => {
   const email = cleanStr(body.email, 254)?.toLowerCase();
   const password = typeof body.password === 'string' ? body.password : null;
   const displayName = cleanStr(body.displayName, 80);
+  const gender = GENDERS.has(body.gender) ? body.gender : null;
   if (!email || !EMAIL_RE.test(email)) return send(res, 400, { error: 'invalid_email' });
   if (!password || password.length < 8 || password.length > 200) return send(res, 400, { error: 'password_too_short' });
   if (!displayName) return send(res, 400, { error: 'invalid_display_name' });
+  // Gender is mandatory at signup: learning is same-gender only, and the
+  // database fails closed when gender is missing.
+  if (!gender) return send(res, 400, { error: 'invalid_gender' });
 
   const created = await db.asService(async (c) => {
     const existing = await c.query('select 1 from dev_auth.users where email = $1', [email]);
@@ -130,7 +135,7 @@ route('POST', '/api/auth/register', async (req, res) => {
   if (!created) return send(res, 409, { error: 'email_taken' });
 
   await db.withRls(created, (c) => c.query(
-    'insert into public.profiles (id, display_name) values ($1, $2)', [created, displayName]));
+    'insert into public.profiles (id, display_name, gender) values ($1, $2, $3)', [created, displayName, gender]));
 
   const token = newSessionToken();
   await db.asService((c) => c.query(
@@ -173,7 +178,7 @@ route('POST', '/api/auth/logout', async (req, res) => {
 route('GET', '/api/me', async (req, res, user) => {
   const data = await db.withRls(user.id, async (c) => {
     const p = await c.query(
-      `select display_name, bio, learning_topics, learning_level, preferred_modes, available_days, availability_notes
+      `select display_name, gender, bio, learning_topics, learning_level, preferred_modes, available_days, availability_notes
          from public.profiles where id = $1`, [user.id]);
     const m = await c.query(
       'select id, kind, value, is_primary from public.contact_methods where user_id = $1 order by is_primary desc, created_at',
@@ -195,10 +200,20 @@ route('PUT', '/api/me/profile', async (req, res, user) => {
   if (!displayName || bio === null || topics === null || level === undefined || modes === null || days === null || notes === null) {
     return send(res, 400, { error: 'invalid_input' });
   }
-  await db.withRls(user.id, (c) => c.query(
-    `update public.profiles set display_name=$2, bio=$3, learning_topics=$4, learning_level=$5,
-       preferred_modes=$6, available_days=$7, availability_notes=$8, updated_at=now() where id=$1`,
-    [user.id, displayName, bio, topics, level, modes, days, notes]));
+  if (body.gender !== undefined && !GENDERS.has(body.gender)) {
+    return send(res, 400, { error: 'invalid_gender' });
+  }
+  await db.withRls(user.id, async (c) => {
+    await c.query(
+      `update public.profiles set display_name=$2, bio=$3, learning_topics=$4, learning_level=$5,
+         preferred_modes=$6, available_days=$7, availability_notes=$8, updated_at=now() where id=$1`,
+      [user.id, displayName, bio, topics, level, modes, days, notes]);
+    // A gender change severs all existing connections and interest selections
+    // (AFTER UPDATE trigger in migration 0004) so no cross-gender tie survives.
+    if (body.gender !== undefined) {
+      await c.query('update public.profiles set gender=$2, updated_at=now() where id=$1', [user.id, body.gender]);
+    }
+  });
   send(res, 200, { ok: true });
 });
 

@@ -19,15 +19,16 @@ await page.screenshot({ path: '/downloads/rebuild-a11y-landing-320.png' });
 
 // keyboard: tab from top reaches the auth CTA, Enter activates it
 await page.keyboard.press('Tab');
-const firstFocus = await page.evaluate(() => document.activeElement?.textContent?.trim());
-check('K2 first tab stop is the auth button', (firstFocus || '').includes('התחברות'), `got "${firstFocus}"`);
+await page.keyboard.press('Tab');
+const secondFocus = await page.evaluate(() => document.activeElement?.textContent?.trim());
+check('K2 auth button reachable by keyboard', (secondFocus || '').includes('התחברות'), `got "${secondFocus}"`);
 await page.keyboard.press('Enter');
 await page.waitForSelector('form', { timeout: 8000 });
 check('K3 auth form opened via keyboard', true);
 
 // tab through form fields in order
 const order = [];
-for (let i = 0; i < 5; i++) {
+for (let i = 0; i < 8; i++) {
   await page.keyboard.press('Tab');
   order.push(await page.evaluate(() => document.activeElement?.tagName + ':' + (document.activeElement?.type || document.activeElement?.textContent?.trim()?.slice(0, 12))));
 }
