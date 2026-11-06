@@ -511,24 +511,21 @@ route('POST', '/api/interests', async (req, res, user) => {
 
 route('GET', '/api/matches', async (req, res, user) => {
   const data = await db.withRls(user.id, async (c) => {
-    const matches = await c.query('select candidate_id, matched_at from public.list_my_matches()');
-    if (!matches.rows.length) return [];
-    const ids = matches.rows.map((r) => r.candidate_id);
-    const profiles = await c.query(
-      `select id, display_name, bio, learning_topics, learning_level, preferred_modes, available_days
-         from public.profiles where id = any($1)`, [ids]);
-    const byId = new Map(profiles.rows.map((p) => [p.id, p]));
-    return matches.rows.map((m) => {
-      const p = byId.get(m.candidate_id);
-      return {
-        candidateId: m.candidate_id,
-        matchedAt: m.matched_at,
-        card: p ? {
-          displayName: p.display_name, bio: p.bio, learningTopics: p.learning_topics,
-          learningLevel: p.learning_level, preferredModes: p.preferred_modes, availableDays: p.available_days,
-        } : null,
-      };
-    });
+    // Single round trip: join profiles inside the same query (RLS applies to
+    // both the function's filters and the profiles read).
+    const matches = await c.query(
+      `select m.candidate_id, m.matched_at,
+              p.display_name, p.bio, p.learning_topics, p.learning_level, p.preferred_modes, p.available_days
+         from public.list_my_matches() m
+         left join public.profiles p on p.id = m.candidate_id`);
+    return matches.rows.map((m) => ({
+      candidateId: m.candidate_id,
+      matchedAt: m.matched_at,
+      card: m.display_name != null ? {
+        displayName: m.display_name, bio: m.bio, learningTopics: m.learning_topics,
+        learningLevel: m.learning_level, preferredModes: m.preferred_modes, availableDays: m.available_days,
+      } : null,
+    }));
   });
   send(res, 200, { matches: data });
 });
