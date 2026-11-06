@@ -22,6 +22,7 @@ function jar() {
       return { status: res.status, data };
     },
     clear() { cookie = ''; },
+    get cookie() { return cookie; },
   };
 }
 
@@ -56,7 +57,7 @@ r = await bob.call('PUT', '/api/me/profile', {
 check('P1 bob updates profile', r.status === 200, JSON.stringify(r.data));
 r = await bob.call('PUT', '/api/me/profile', { displayName: 'בוב', bio: 'x', learningTopics: [], learningLevel: 'wizard', preferredModes: [], availableDays: [], availabilityNotes: '' });
 check('P2 invalid level rejected', r.status === 400);
-r = await bob.call('PUT', '/api/me/contact-methods', { methods: [{ kind: 'phone', value: '0501234567', isPrimary: true }] });
+r = await bob.call('PUT', '/api/me/contact-methods', { methods: [{ kind: 'phone', value: '0500000000', isPrimary: true }] });
 check('P3 bob saves contact method', r.status === 200);
 r = await alice.call('PUT', '/api/me/profile', {
   displayName: 'אליס', bio: 'לומדת תנ"ך', learningTopics: ['תנ"ך'],
@@ -124,7 +125,7 @@ check('N7 contact denied with one-sided consent', r.status === 403);
 r = await alice.call('POST', `/api/connections/${connId}/consent`, { consent: true });
 check('N8 alice consents', r.status === 200);
 r = await alice.call('GET', `/api/connections/${connId}/contact`);
-check('N9 contact revealed after mutual consent', r.status === 200 && r.data.contactMethods.some((m) => m.value === '0501234567'), JSON.stringify(r.data));
+check('N9 contact revealed after mutual consent', r.status === 200 && r.data.contactMethods.some((m) => m.value === '0500000000'), JSON.stringify(r.data));
 r = await bob.call('GET', `/api/connections/${connId}/contact`);
 check('N10 bob gets empty list (alice has no methods)', r.status === 200 && r.data.contactMethods.length === 0);
 r = await eve.call('GET', `/api/connections/${connId}/contact`);
@@ -155,6 +156,45 @@ r = await eve.call('POST', '/api/reports', { reportedUserId: bobId, reason: 'ה�
 check('R1 report accepted', r.status === 201);
 r = await eve.call('POST', '/api/reports', { reason: 'x', details: '' });
 check('R2 invalid report rejected', r.status === 400);
+
+// --- account deletion ---
+r = await eve.call('DELETE', '/api/me');
+check('D1 eve deletes own account', r.status === 200);
+r = await eve.call('GET', '/api/me');
+check('D2 deleted session is dead', r.status === 401);
+r = await alice.call('GET', '/api/candidates');
+check('D3 deleted user gone from candidates', !r.data.candidates.some((c) => c.id === eveId));
+const eveRelog = jar();
+r = await eveRelog.call('POST', '/api/auth/login', { email: 'eve@test.dev', password: pw });
+check('D4 deleted user cannot login', r.status === 401);
+
+// --- input abuse ---
+r = await alice.call('PUT', '/api/me/profile', { displayName: 'א'.repeat(81), bio: '', learningTopics: [], learningLevel: null, preferredModes: [], availableDays: [], availabilityNotes: '' });
+check('X1 oversized display name rejected', r.status === 400);
+{
+  const raw = await fetch(BASE + '/api/me/profile', { method: 'PUT', headers: { 'content-type': 'text/plain', cookie: '' }, body: 'displayName=x' });
+  check('X2 non-JSON body rejected', raw.status === 400 || raw.status === 401);
+  let huge = 'x'.repeat(70 * 1024);
+  const raw2 = await fetch(BASE + '/api/me/profile', { method: 'PUT', headers: { 'content-type': 'application/json', cookie: alice.cookie }, body: JSON.stringify({ displayName: huge }) });
+  check('X3 oversized payload rejected', raw2.status === 413 || raw2.status === 400, `status=${raw2.status}`);
+  const raw3 = await fetch(BASE + '/api/interests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{not json' });
+  check('X4 malformed JSON rejected', raw3.status === 400 || raw3.status === 401);
+}
+// XSS-shaped input is stored as data (React escapes on render) but must not break API
+r = await bob.call('PUT', '/api/me/profile', { displayName: '<b>בוב</b>', bio: '<script>alert(1)</script>', learningTopics: [], learningLevel: null, preferredModes: [], availableDays: [], availabilityNotes: '' });
+check('X5 markup-shaped input handled safely', r.status === 200);
+r = await alice.call('GET', '/api/candidates');
+check('X6 markup returned as plain data', r.data.candidates.find((c) => c.id === bobId)?.displayName === '<b>בוב</b>');
+await bob.call('PUT', '/api/me/profile', { displayName: 'בוב', bio: 'לומד גמרא', learningTopics: ['גמרא'], learningLevel: 'intermediate', preferredModes: ['video'], availableDays: ['sun', 'tue'], availabilityNotes: '' });
+
+// --- auth rate limiting ---
+const rl = jar();
+let lastStatus = 0;
+for (let i = 0; i < 21; i++) {
+  const rr = await rl.call('POST', '/api/auth/login', { email: 'rl@test.dev', password: 'wrong-pass-123' });
+  lastStatus = rr.status;
+}
+check('X7 login rate limit kicks in', lastStatus === 429, `last=${lastStatus}`);
 
 // --- logout ---
 r = await alice.call('POST', '/api/auth/logout');

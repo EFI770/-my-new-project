@@ -31,3 +31,36 @@
 2. אין rate limiting, אין קונסול ניהול/מודרציה, אין מחיקת חשבון, אין מדיניות שמירת מידע.
 3. 0003 הוא DRAFT ודורש סקירה לפני החלה על פרויקט אמיתי.
 4. הבנייה (`app/dist`) לא נפרסת בשום מקום; האתר החי לא השתנה.
+
+## מיפוי לספק עתידי (הוכחת תאימות "רק שכבת התעבורה משתנה")
+כל מתודה ב-`app/src/api.js` ממופה לקריאת Supabase עתידית. ההבדלים היחידים שאינם 1:1
+מסומנים ודורשים מיגרציה קטנה נוספת:
+
+| api.js | Supabase עתידי | הערה |
+|---|---|---|
+| register/login/logout | auth.signUp / signInWithPassword / signOut | יצירת פרופיל אוטומטית דרך trigger על auth.users (מיגרציה קטנה) |
+| me / updateProfile | from('profiles') | RLS קיים; הפרופיל נוצר ע"י trigger |
+| updateContactMethods | from('contact_methods') delete+insert | RLS קיים |
+| candidates | from('profiles').select(allowlist) + from('interest_selections') (שלי בלבד) | שתי קריאות, מיזוג בלקוח; RLS מסנן חסימות |
+| setInterest | from('interest_selections').upsert | RLS קיים |
+| matches | rpc('list_my_matches') + from('profiles') | RLS קיים |
+| studyRequests | from('study_requests') עם FK נוסף owner_id->profiles(id) או view | **דרוש תוספת מיגרציה קטנה** לשם הבעלים |
+| connections | from('connection_requests') + from('profiles') | RLS קיים; ה enrichment בלקוח |
+| respond / consent / contact | rpc('respond_to_connection_request' / 'consent_to_contact' / 'get_connection_contact') | 1:1 |
+| blocks / reports | from('user_blocks') / from('user_reports') | RLS קיים |
+| deleteAccount | rpc('delete_own_account') security definer או Edge Function | **דרוש תוספת מיגרציה קטנה** |
+
+סשנים/CSRF: ב-Supabase האימות מבוסס bearer token ולא cookie, ולכן CSRF אינו רלוונטי
+שם; באמולטור נאכף SameSite=Lax + JSON-only. Rate limiting: בספק מובנה ב-Auth; באמולטור
+הוטמע מגביל פיתוח (login/register) לצורך בדיקות.
+
+## פערי אמולציה מול ספק אמיתי (לכיסוי בבדיקות ביצוע לאחר בחירת ספק)
+- `app.sub` מקומי מדמה JWT claims; עדיין לא נבדק מול auth.jwt() של Supabase.
+- אימות בעלות על אימייל (confirm email) לא ממומש בפיתוח.
+- PostgREST pooling/limits שונים מהאמולטור.
+
+## עובדות ספק עדכנויות (נבדק מול מקורות רשמיים, 2026-11-06)
+- תוכנית Free: פרויקט מושהה אחרי 7 ימי חוסר פעילות; אימייל התראה כשבוע לפני; שחזור
+  עד שנה מההשהיה. מקור: https://supabase.com/docs/guides/platform/free-project-pausing
+- אימות אימייל+סיסמה עם אישור בעלות: מובנה.
+  מקור: https://supabase.com/docs/guides/auth/auth-email

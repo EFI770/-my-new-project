@@ -30,7 +30,7 @@ await apiCall('PUT', '/api/me/profile', {
   displayName: B.name, bio: 'מחפשת חברותא נעימה לפרשת שבוע', learningTopics: ['פרשת שבוע', 'גמרא'],
   learningLevel: 'beginner', preferredModes: ['in_person', 'video'], availableDays: ['mon', 'tue'], availabilityNotes: '',
 }, bCookie);
-await apiCall('PUT', '/api/me/contact-methods', { methods: [{ kind: 'whatsapp', value: '052-7654321', isPrimary: true }] }, bCookie);
+await apiCall('PUT', '/api/me/contact-methods', { methods: [{ kind: 'whatsapp', value: '050-0000000', isPrimary: true }] }, bCookie);
 
 const browser = await puppeteer.launch({
   executablePath: '/usr/bin/google-chrome',
@@ -122,7 +122,7 @@ await page.evaluate(() => {
 await new Promise((r) => setTimeout(r, 800));
 await page.waitForFunction(() => document.body.textContent.includes('הצגת פרטי קשר'), { timeout: 8000 });
 await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('הצגת פרטי קשר'))?.click());
-await page.waitForFunction(() => document.body.textContent.includes('052-7654321'), { timeout: 8000 });
+await page.waitForFunction(() => document.body.textContent.includes('050-0000000'), { timeout: 8000 });
 check('V9 contact revealed in UI after mutual consent', true);
 await page.screenshot({ path: `${SHOT_DIR}/rebuild-07-contact.png`, fullPage: true });
 

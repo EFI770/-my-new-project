@@ -30,7 +30,13 @@ function readBody(req) {
     let size = 0; const chunks = [];
     req.on('data', (c) => {
       size += c.length;
-      if (size > JSON_LIMIT) { reject(Object.assign(new Error('too_large'), { status: 413 })); req.destroy(); return; }
+      if (size > JSON_LIMIT) {
+        req.removeAllListeners('data');
+        req.removeAllListeners('end');
+        req.pause();
+        reject(Object.assign(new Error('too_large'), { status: 413 }));
+        return;
+      }
       chunks.push(c);
     });
     req.on('end', () => {
@@ -82,6 +88,17 @@ function cleanArray(v, allowed, maxLen = 20) {
   return v;
 }
 
+// Dev-scope rate limiting (in-memory). Production limits belong to the vendor/edge
+// layer; these exist so abuse behavior is testable in development.
+const buckets = new Map();
+function rateLimited(key, limit, windowMs) {
+  const now = Date.now();
+  const b = (buckets.get(key) || []).filter((t) => now - t < windowMs);
+  b.push(now);
+  buckets.set(key, b);
+  return b.length > limit;
+}
+
 const routes = [];
 function route(method, pattern, handler) {
   const keys = [];
@@ -91,6 +108,7 @@ function route(method, pattern, handler) {
 
 // ---------- auth (dev-only) ----------
 route('POST', '/api/auth/register', async (req, res) => {
+  if (rateLimited(`reg:${req.socket.remoteAddress}`, 10, 3600_000)) return send(res, 429, { error: 'rate_limited' });
   const body = await readBody(req);
   const email = cleanStr(body.email, 254)?.toLowerCase();
   const password = typeof body.password === 'string' ? body.password : null;
@@ -124,6 +142,7 @@ route('POST', '/api/auth/register', async (req, res) => {
 });
 
 route('POST', '/api/auth/login', async (req, res) => {
+  if (rateLimited(`login:${req.socket.remoteAddress}`, 20, 600_000)) return send(res, 429, { error: 'rate_limited' });
   const body = await readBody(req);
   const email = cleanStr(body.email, 254)?.toLowerCase();
   const password = typeof body.password === 'string' ? body.password : '';
@@ -197,6 +216,17 @@ route('PUT', '/api/me/contact-methods', async (req, res, user) => {
     }
   });
   send(res, 200, { ok: true });
+});
+
+route('DELETE', '/api/me', async (req, res, user) => {
+  // Dev-scope account deletion. FK cascades (on delete cascade) remove profile,
+  // contact methods, interest selections and connection requests; reports filed
+  // BY the user are removed, reports ABOUT the user keep null user reference.
+  await db.asService(async (c) => {
+    await c.query('delete from auth.users where id = $1', [user.id]);
+    await c.query('delete from dev_auth.users where id = $1', [user.id]);
+  });
+  send(res, 200, { ok: true }, { 'set-cookie': 'dev_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
 });
 
 // ---------- candidates & private interest ----------

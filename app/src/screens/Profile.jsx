@@ -15,6 +15,7 @@ export default function Profile() {
   const [methods, setMethods] = useState(me.contactMethods || []);
   const [blocks, setBlocks] = useState(null);
   const [report, setReport] = useState(null); // {reason, details, reportedUserId}
+  const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => { api.blocks().then((r) => setBlocks(r.blocks)).catch(() => setBlocks([])); }, []);
 
   function toggle(list, v) { return list.includes(v) ? list.filter((x) => x !== v) : [...list, v]; }
@@ -49,6 +50,13 @@ export default function Profile() {
       await api.report({ reportedUserId: report.reportedUserId || undefined, reason: report.reason, details: report.details });
       setReport(null);
       showToast('הדיווח נשלח לטיפול');
+    } catch (err) { showToast(heError(err)); }
+  }
+
+  async function deleteAccount() {
+    try {
+      await api.deleteAccount();
+      await refreshMe();
     } catch (err) { showToast(heError(err)); }
   }
 
@@ -181,6 +189,25 @@ export default function Profile() {
         <button onClick={logout} className="mt-2 w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-[14px] text-ink-2">
           התנתקות
         </button>
+        {confirmDelete ? (
+          <div className="mt-4 rounded-[14px] border border-[#fecaca] bg-[#fef2f2] p-4">
+            <div className="text-[13px] leading-6 text-[#991b1b]">
+              המחיקה מסירה את הפרופיל, פרטי הקשר, הבחירות והחיבורים שלך. אין דרך לשחזר.
+            </div>
+            <div className="flex gap-2 pt-3">
+              <button onClick={deleteAccount} className="flex-1 rounded-full bg-danger py-2.5 text-[14px] font-medium text-white">
+                מחיקה סופית
+              </button>
+              <button onClick={() => setConfirmDelete(false)} className="flex-1 rounded-full border border-[#e7e5e4] bg-white py-2.5 text-[14px]">
+                ביטול
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmDelete(true)} className="mt-3 w-full text-[12px] text-ink-2 underline">
+            מחיקת החשבון והנתונים
+          </button>
+        )}
       </section>
     </div>
   );

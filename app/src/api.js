@@ -23,6 +23,7 @@ export const api = {
   login: (b) => call('POST', '/api/auth/login', b),
   logout: () => call('POST', '/api/auth/logout'),
   me: () => call('GET', '/api/me'),
+  deleteAccount: () => call('DELETE', '/api/me'),
   updateProfile: (b) => call('PUT', '/api/me/profile', b),
   updateContactMethods: (methods) => call('PUT', '/api/me/contact-methods', { methods }),
   candidates: () => call('GET', '/api/candidates'),
