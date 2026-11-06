@@ -7,6 +7,7 @@ import Candidates from './screens/Candidates.jsx';
 import Requests from './screens/Requests.jsx';
 import Connections from './screens/Connections.jsx';
 import Profile from './screens/Profile.jsx';
+import { Privacy, Accessibility } from './screens/Legal.jsx';
 
 const AppCtx = createContext(null);
 export function useApp() { return useContext(AppCtx); }
@@ -79,7 +80,7 @@ function Shell() {
   if (!me) {
     return (
       <AppCtx.Provider value={ctx}>
-        <main id="main">{route === 'auth' ? <AuthScreen /> : <Landing />}</main>
+        <main id="main">{route === 'auth' ? <AuthScreen /> : route === 'privacy' ? <Privacy /> : route === 'accessibility' ? <Accessibility /> : <Landing />}</main>
         {toast && <Toast text={toast} />}
       </AppCtx.Provider>
     );
@@ -100,6 +101,8 @@ function Shell() {
           </div>
         </header>
         <main id="main" ref={mainRef} tabIndex={-1} className="px-5 pt-5 outline-none">
+          {route === 'privacy' && <Privacy />}
+          {route === 'accessibility' && <Accessibility />}
           {tab === 'find' && <Candidates />}
           {tab === 'requests' && <Requests />}
           {tab === 'connections' && <Connections />}

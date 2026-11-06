@@ -65,6 +65,13 @@ async function proxyVendorAuth(req, res, url) {
 
 const ENV = config.env || {};
 
+// Neon management API wiring (community mode only): used exclusively to erase
+// the vendor-side identity record on account deletion, so deletion is complete
+// (privacy). Vendor-owned neon_auth.* tables are never touched by SQL; this is
+// the management API route verified for fixture cleanup 2026-11-06.
+// Absent config = vendor deletion is skipped and the fact is logged/reported.
+const NEON_MGMT = config.neonManagement || null;
+
 const JSON_LIMIT = 64 * 1024;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CONTACT_KINDS = new Set(['phone', 'email', 'whatsapp', 'telegram']);
@@ -421,16 +428,40 @@ route('PUT', '/api/me/contact-methods', async (req, res, user) => {
 });
 
 route('DELETE', '/api/me', async (req, res, user) => {
-  // Dev-scope account deletion. FK cascades (on delete cascade) remove profile,
-  // contact methods, interest selections and connection requests; reports filed
-  // BY the user are removed, reports ABOUT the user keep null user reference.
+  // FK cascades (on delete cascade) remove profile, contact methods, interest
+  // selections and connection requests; reports filed BY the user are removed,
+  // reports ABOUT the user keep null user reference.
+  let authSub = null;
   await db.asService(async (c) => {
+    const { rows } = await c.query('select auth_sub from auth.users where id = $1', [user.id]);
+    authSub = rows[0] && rows[0].auth_sub || null;
     await c.query('delete from auth.users where id = $1', [user.id]);
     if (AUTH_MODE !== 'neon') await c.query('delete from dev_auth.users where id = $1', [user.id]);
-    // Neon mode: the vendor account itself is managed by Neon Auth and is
-    // intentionally not deleted here.
   });
-  send(res, 200, { ok: true }, { 'set-cookie': 'dev_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
+  // Neon mode: erase the vendor identity record too (management API only), so
+  // account deletion is complete. Local data is already gone either way; a
+  // vendor failure is logged and reported, never hidden. 404 counts as deleted
+  // (record already absent).
+  let vendorDeleted = null;
+  if (AUTH_MODE === 'neon' && authSub) {
+    if (NEON_MGMT && NEON_MGMT.apiKey && NEON_MGMT.projectId && NEON_MGMT.branchId) {
+      try {
+        const base = (NEON_MGMT.baseUrl || 'https://console.neon.tech/api/v2').replace(/\/$/, '');
+        const r = await fetch(`${base}/projects/${NEON_MGMT.projectId}/branches/${NEON_MGMT.branchId}/auth/users/${encodeURIComponent(authSub)}`, {
+          method: 'DELETE',
+          headers: { authorization: `Bearer ${NEON_MGMT.apiKey}` },
+        });
+        vendorDeleted = r.status === 204 || r.status === 404;
+        if (!vendorDeleted) console.error(`[api] neon vendor user delete failed: HTTP ${r.status}`);
+      } catch (e) {
+        vendorDeleted = false;
+        console.error('[api] neon vendor user delete failed:', (e && e.message) || e);
+      }
+    } else {
+      console.error('[api] neon vendor user delete skipped: neonManagement not configured');
+    }
+  }
+  send(res, 200, { ok: true, ...(vendorDeleted === null ? {} : { vendorDeleted }) }, { 'set-cookie': 'dev_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
 });
 
 // ---------- candidates & private interest ----------

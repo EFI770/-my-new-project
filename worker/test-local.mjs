@@ -4,8 +4,9 @@
 import worker from './index.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DIST = path.resolve('../app/dist');
+const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'app', 'dist');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 const CONN = 'postgresql://postgres@/chavruta_dev?host=/tmp/chavruta-pgsock-dev';
 const KEY = 'local-test-gate-key-0123456789abcdef';

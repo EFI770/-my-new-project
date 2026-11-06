@@ -28,7 +28,7 @@ $f$;
 grant usage on schema public to anon, authenticated;
 grant usage on schema auth to anon, authenticated;
 SQL
-for f in supabase/migrations/0001_initial_schema.sql supabase/migrations/0002_contact_consent_and_blocks.sql supabase/migrations/0003_private_interests_and_contact_disclosure.sql supabase/migrations/0004_gender_separation.sql; do
+for f in supabase/migrations/0001_initial_schema.sql supabase/migrations/0002_contact_consent_and_blocks.sql supabase/migrations/0003_private_interests_and_contact_disclosure.sql supabase/migrations/0004_gender_separation.sql supabase/migrations/0005_neon_vendor_bootstrap.sql supabase/migrations/0006_age_attestation.sql; do
   psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f "$f"
 done
 psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q <<'SQL'

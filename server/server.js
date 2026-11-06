@@ -20,6 +20,12 @@ const api = createApiHandler({
   neonJwksUrl: process.env.NEON_AUTH_JWKS_URL,
   neonIssuer: process.env.NEON_AUTH_ISSUER,
   neonAudience: process.env.NEON_AUTH_AUDIENCE,
+  neonManagement: process.env.NEON_MANAGEMENT_API_KEY ? {
+    apiKey: process.env.NEON_MANAGEMENT_API_KEY,
+    projectId: process.env.NEON_PROJECT_ID,
+    branchId: process.env.NEON_BRANCH_ID,
+    baseUrl: process.env.NEON_MANAGEMENT_BASE_URL,
+  } : null,
   db: createDb({ socketDir: SOCKET_DIR, database: DATABASE }),
   env: process.env,
 });

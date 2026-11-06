@@ -109,6 +109,13 @@ function getApi(env) {
       neonJwksUrl: env.NEON_AUTH_JWKS_URL,
       neonIssuer: env.NEON_AUTH_ISSUER,
       neonAudience: env.NEON_AUTH_AUDIENCE || undefined,
+      // Account-deletion erasure of the vendor identity record (community
+      // mode). Secret lives only in the Worker env; never sent to clients.
+      neonManagement: env.NEON_MANAGEMENT_API_KEY ? {
+        apiKey: env.NEON_MANAGEMENT_API_KEY,
+        projectId: env.NEON_PROJECT_ID,
+        branchId: env.NEON_BRANCH_ID,
+      } : null,
       db: createDb({
         appUrl: env.HYPERDRIVE_APP.connectionString,
         adminUrl: env.HYPERDRIVE_ADMIN.connectionString,

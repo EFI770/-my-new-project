@@ -64,7 +64,10 @@ export default function Landing() {
 
       <footer className="py-10 text-center text-[12px] leading-6 text-ink-2">
         <div>{t('landingFooter1')}</div>
-        <div>{t('landingFooter2')}</div>
+        <nav className="flex justify-center gap-4 pt-2" aria-label={t('legalNavLabel')}>
+          <a href="#/privacy" className="underline">{t('footerPrivacy')}</a>
+          <a href="#/accessibility" className="underline">{t('footerAccessibility')}</a>
+        </nav>
       </footer>
     </div>
   );
