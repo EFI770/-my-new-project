@@ -20,6 +20,49 @@ const neonAuth = AUTH_MODE === 'neon' ? createNeonAuth({
 }) : null;
 
 const db = config.db;
+
+// Same-origin proxy to the Neon Auth vendor (Neon mode only). The vendor
+// session cookie stays first-party. The REAL incoming Origin is forwarded
+// unchanged; the app origin must be allowlisted under the vendor's trusted
+// domains (management API config step). Never substitute the vendor's own
+// origin here - that would defeat the vendor's origin/CSRF check instead of
+// satisfying it (explicitly rejected in review of d888d43).
+async function proxyVendorAuth(req, res, url) {
+  const base = (ENV.NEON_AUTH_URL || '').replace(/\/+$/, '');
+  if (!base) return send(res, 503, { error: 'vendor_auth_not_configured' });
+  // base is a fixed config value and only a PATH is appended, so the target
+  // authority can never escape the vendor origin.
+  const target = base + url.replace(/^\/vendor-auth/, '') + ((req.url || '').includes('?') ? '?' + (req.url || '').split('?')[1] : '');
+  // Forward ONLY what the vendor flow needs: content-type, the incoming
+  // Cookie (the proxy's whole purpose - /token and /get-session need it),
+  // and the real incoming Origin when present.
+  const headers = {
+    'content-type': req.headers['content-type'] || 'application/json',
+    ...(req.headers.cookie ? { cookie: req.headers.cookie } : {}),
+    ...(req.headers.origin ? { origin: req.headers.origin } : {}),
+  };
+  const chunks = [];
+  for await (const ch of req) chunks.push(typeof ch === 'string' ? Buffer.from(ch) : ch);
+  const body = chunks.length ? Buffer.concat(chunks) : undefined;
+  let upstream;
+  try {
+    upstream = await fetch(target, { method: req.method, headers, body, redirect: 'manual', signal: AbortSignal.timeout(15000) });
+  } catch {
+    return send(res, 502, { error: 'vendor_auth_unreachable' });
+  }
+  // first-party rewrite: strip Domain so the cookie binds to our origin
+  const setCookies = (upstream.headers.getSetCookie ? upstream.headers.getSetCookie() : [])
+    .map((c) => c.replace(/;\s*Domain=[^;]*/i, ''));
+  const outHeaders = {
+    'content-type': upstream.headers.get('content-type') || 'application/json',
+    ...(upstream.headers.get('location') ? { location: upstream.headers.get('location') } : {}),
+    ...(setCookies.length ? { 'set-cookie': setCookies } : {}),
+  };
+  res.writeHead(upstream.status, outHeaders);
+  res.end(Buffer.from(await upstream.arrayBuffer()));
+}
+
+
 const ENV = config.env || {};
 
 const JSON_LIMIT = 64 * 1024;
