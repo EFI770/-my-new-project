@@ -590,12 +590,31 @@ function serveStatic(req, res) {
 async function proxyVendorAuth(req, res, url) {
   const base = (process.env.NEON_AUTH_URL || '').replace(/\/+$/, '');
   if (!base) return send(res, 503, { error: 'vendor_auth_not_configured' });
+  // base is a fixed env value and only a PATH is appended, so the target
+  // authority can never escape the vendor origin.
   const target = base + url.replace(/^\/vendor-auth/, '') + ((req.url || '').includes('?') ? '?' + (req.url || '').split('?')[1] : '');
-  const headers = { 'content-type': req.headers['content-type'] || 'application/json', origin: base.replace(/\/neondb\/auth.*$/, '') };
+  // Forward ONLY what the vendor flow needs. The incoming Cookie is the whole
+  // point of this proxy (first-party vendor session) - dropping it would break
+  // /token and /get-session. Origin is set to the vendor's own origin so
+  // dev-mode Better Auth treats the call as same-site; PROPER production mode
+  // is forwarding our real app origin and allowlisting it under the vendor's
+  // trusted domains (console config, currently blocked). Marked: the dev
+  // behavior relies on the vendor's shared-credentials posture and must be
+  // re-verified live before any real user traffic.
+  const headers = {
+    'content-type': req.headers['content-type'] || 'application/json',
+    origin: base.replace(/\/neondb\/auth.*$/, ''),
+    ...(req.headers.cookie ? { cookie: req.headers.cookie } : {}),
+  };
   const chunks = [];
   for await (const ch of req) chunks.push(ch);
   const body = chunks.length ? Buffer.concat(chunks) : undefined;
-  const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'manual' });
+  let upstream;
+  try {
+    upstream = await fetch(target, { method: req.method, headers, body, redirect: 'manual', signal: AbortSignal.timeout(15000) });
+  } catch {
+    return send(res, 502, { error: 'vendor_auth_unreachable' });
+  }
   // first-party rewrite: strip Domain so the cookie binds to our origin
   const setCookies = (upstream.headers.getSetCookie ? upstream.headers.getSetCookie() : [])
     .map((c) => c.replace(/;\s*Domain=[^;]*/i, ''));
