@@ -108,7 +108,7 @@ returns void
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_user_id uuid := auth.uid();
 begin
@@ -137,7 +137,7 @@ begin
     raise exception 'Request not found or action not permitted' using errcode = '42501';
   end if;
 end;
-$;
+$$;
 
 revoke all on function public.respond_to_connection_request(uuid, text) from public, anon;
 grant execute on function public.respond_to_connection_request(uuid, text) to authenticated;
