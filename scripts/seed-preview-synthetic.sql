@@ -42,9 +42,16 @@ insert into public.profiles (id, display_name, gender, age_attested_at, bio, lea
 on conflict (id) do nothing;
 
 -- Synthetic contact methods for all four (revealed only after consent).
-insert into public.contact_methods (user_id, kind, value, is_primary) values
-  ('94aae434-8b47-41a0-8343-422d47cd9ca3', 'whatsapp', '050-0000001', true),
-  ('3fb6f0c4-c7a9-4b8c-90ad-73297816af31', 'whatsapp', '050-0000002', true),
-  ('11111111-1111-4111-8111-111111111111', 'phone', '050-0000003', true),
-  ('22222222-2222-4222-8222-222222222222', 'whatsapp', '050-0000004', true)
-on conflict do nothing;
+-- Idempotent: no unique constraint on (user_id, kind, value), so guard explicitly.
+insert into public.contact_methods (user_id, kind, value, is_primary)
+select v.user_id, v.kind, v.value, true
+from (values
+  ('94aae434-8b47-41a0-8343-422d47cd9ca3'::uuid, 'whatsapp', '050-0000001'),
+  ('3fb6f0c4-c7a9-4b8c-90ad-73297816af31'::uuid, 'whatsapp', '050-0000002'),
+  ('11111111-1111-4111-8111-111111111111'::uuid, 'phone', '050-0000003'),
+  ('22222222-2222-4222-8222-222222222222'::uuid, 'whatsapp', '050-0000004')
+) as v(user_id, kind, value)
+where not exists (
+  select 1 from public.contact_methods c
+  where c.user_id = v.user_id and c.kind = v.kind and c.value = v.value
+);
