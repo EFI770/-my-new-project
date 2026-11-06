@@ -74,6 +74,8 @@ function Shell() {
   }
 
   const tab = TABS.some((tb) => tb.key === route) ? route : 'find';
+  const mainRef = React.useRef(null);
+  useEffect(() => { mainRef.current?.focus({ preventScroll: true }); }, [tab]);
   return (
     <AppCtx.Provider value={ctx}>
       <div className="mx-auto min-h-screen max-w-[920px] pb-24">
@@ -88,7 +90,7 @@ function Shell() {
             <LangSwitch />
           </div>
         </header>
-        <main id="main" tabIndex={-1} className="px-5 pt-5">
+        <main id="main" ref={mainRef} tabIndex={-1} className="px-5 pt-5 outline-none">
           {tab === 'find' && <Candidates />}
           {tab === 'requests' && <Requests />}
           {tab === 'connections' && <Connections />}
