@@ -23,7 +23,13 @@ update public.profiles set
   availability_notes = 'בוקר'
 where id = '3fb6f0c4-c7a9-4b8c-90ad-73297816af31';
 
--- Second man + second woman (candidates only, no login identity).
+-- Second man + second woman: login identities bound to their fixed profile
+-- UUIDs, so the demo-login route finds these rows and does not provision new
+-- empty profiles. Password login stays impossible (sentinel hash).
+insert into dev_auth.users (id, email, password_hash) values
+  ('11111111-1111-4111-8111-111111111111', 'demo.man2@preview.synthetic', 'demo-password-login-impossible'),
+  ('22222222-2222-4222-8222-222222222222', 'demo.woman2@preview.synthetic', 'demo-password-login-impossible')
+on conflict (email) do nothing;
 insert into auth.users (id) values
   ('11111111-1111-4111-8111-111111111111'),
   ('22222222-2222-4222-8222-222222222222')

@@ -204,22 +204,19 @@ export default function AuthScreen() {
       {providers?.demo?.enabled && (
         <div className="pt-4 space-y-2">
           <p className="text-center text-[12px] font-semibold text-ink-2">{t('demoTitle')}</p>
-          <button
-            type="button"
-            onClick={() => demoSignIn('man')}
-            disabled={oauthBusy}
-            className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[15px] font-semibold text-ink disabled:opacity-60"
-          >
-            {t('demoMan')}
-          </button>
-          <button
-            type="button"
-            onClick={() => demoSignIn('woman')}
-            disabled={oauthBusy}
-            className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[15px] font-semibold text-ink disabled:opacity-60"
-          >
-            {t('demoWoman')}
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            {[['man', 'demoMan'], ['man2', 'demoMan2'], ['woman', 'demoWoman'], ['woman2', 'demoWoman2']].map(([id, labelKey]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => demoSignIn(id)}
+                disabled={oauthBusy}
+                className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[14px] font-semibold text-ink disabled:opacity-60"
+              >
+                {t(labelKey)}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {providers?.google?.enabled && providers.google.authUrl && (

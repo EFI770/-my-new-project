@@ -241,8 +241,13 @@ route('POST', '/api/auth/logout', async (req, res) => {
 // data. NEVER enable outside a gated synthetic preview.
 const DEMO_ENABLED = ENV.PREVIEW_DEMO_MODE === 'true' && AUTH_MODE !== 'neon';
 const DEMO_IDENTITIES = {
+  // Two same-gender pairs so the match/request/consent/contact flow is
+  // exercisable end-to-end between login identities (matching is same-gender
+  // by design, so one man + one woman can never match each other).
   man: { email: 'demo.man@preview.synthetic', displayName: 'אברהם (דמו)', gender: 'man' },
+  man2: { email: 'demo.man2@preview.synthetic', displayName: 'יעקב (דמו)', gender: 'man' },
   woman: { email: 'demo.woman@preview.synthetic', displayName: 'שרה (דמו)', gender: 'woman' },
+  woman2: { email: 'demo.woman2@preview.synthetic', displayName: 'רבקה (דמו)', gender: 'woman' },
 };
 if (DEMO_ENABLED) {
   route('POST', '/api/auth/demo-login', async (req, res) => {
