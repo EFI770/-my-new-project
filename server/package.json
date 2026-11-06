@@ -1,0 +1,16 @@
+{
+  "name": "chavruta-dev-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "DEVELOPMENT-ONLY local Supabase emulator: serves the same RLS policies and RPCs over HTTP. Not a production component.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.16.0"
+  }
+}

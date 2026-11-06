@@ -1,0 +1,166 @@
+// End-to-end execution tests: HTTP -> dev emulator -> real Postgres RLS/RPCs.
+// Run via scripts/test-api-local.sh (expects BASE env).
+const BASE = process.env.BASE || 'http://127.0.0.1:4591';
+let pass = 0, fail = 0;
+function check(name, cond, extra = '') {
+  if (cond) { console.log(`ok - ${name}`); pass++; }
+  else { console.log(`FAIL - ${name} ${extra}`); fail++; }
+}
+function jar() {
+  let cookie = '';
+  return {
+    async call(method, path, body) {
+      const res = await fetch(BASE + path, {
+        method,
+        headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const setC = res.headers.get('set-cookie');
+      if (setC) cookie = setC.split(';')[0];
+      let data = null;
+      try { data = await res.json(); } catch {}
+      return { status: res.status, data };
+    },
+    clear() { cookie = ''; },
+  };
+}
+
+const alice = jar(), bob = jar(), eve = jar(), anon = jar();
+const pw = 'test-pass-1234';
+
+// --- auth ---
+let r = await anon.call('GET', '/api/me');
+check('A1 unauthenticated /api/me -> 401', r.status === 401);
+r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: 'short', displayName: 'אליס' });
+check('A2 short password rejected', r.status === 400);
+r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס' });
+check('A3 alice registers', r.status === 201, JSON.stringify(r));
+const aliceId = r.data?.userId;
+r = await alice.call('POST', '/api/auth/register', { email: 'alice@test.dev', password: pw, displayName: 'אליס' });
+check('A4 duplicate email rejected', r.status === 409);
+r = await bob.call('POST', '/api/auth/register', { email: 'bob@test.dev', password: pw, displayName: 'בוב' });
+const bobId = r.data?.userId;
+r = await eve.call('POST', '/api/auth/register', { email: 'eve@test.dev', password: pw, displayName: 'איב' });
+const eveId = r.data?.userId;
+const bobLogin = jar();
+r = await bobLogin.call('POST', '/api/auth/login', { email: 'bob@test.dev', password: 'wrong-pass-1' });
+check('A5 wrong password rejected', r.status === 401);
+r = await bobLogin.call('POST', '/api/auth/login', { email: 'bob@test.dev', password: pw });
+check('A6 bob logs in', r.status === 200);
+
+// --- profile & contact methods ---
+r = await bob.call('PUT', '/api/me/profile', {
+  displayName: 'בוב', bio: 'לומד גמרא', learningTopics: ['גמרא'],
+  learningLevel: 'intermediate', preferredModes: ['video'], availableDays: ['sun', 'tue'], availabilityNotes: '',
+});
+check('P1 bob updates profile', r.status === 200, JSON.stringify(r.data));
+r = await bob.call('PUT', '/api/me/profile', { displayName: 'בוב', bio: 'x', learningTopics: [], learningLevel: 'wizard', preferredModes: [], availableDays: [], availabilityNotes: '' });
+check('P2 invalid level rejected', r.status === 400);
+r = await bob.call('PUT', '/api/me/contact-methods', { methods: [{ kind: 'phone', value: '0501234567', isPrimary: true }] });
+check('P3 bob saves contact method', r.status === 200);
+r = await alice.call('PUT', '/api/me/profile', {
+  displayName: 'אליס', bio: 'לומדת תנ"ך', learningTopics: ['תנ"ך'],
+  learningLevel: 'beginner', preferredModes: ['in_person'], availableDays: ['mon'], availabilityNotes: '',
+});
+check('P4 alice updates profile', r.status === 200);
+r = await eve.call('PUT', '/api/me/profile', {
+  displayName: 'איב', bio: '', learningTopics: ['גמרא'], learningLevel: 'advanced',
+  preferredModes: ['phone'], availableDays: ['wed'], availabilityNotes: '',
+});
+check('P5 eve updates profile', r.status === 200);
+
+// --- candidates: allowlisted fields only, no contact data ---
+r = await alice.call('GET', '/api/candidates');
+check('C1 alice lists candidates', r.status === 200);
+const bobCard = r.data.candidates.find((c) => c.id === bobId);
+check('C2 bob appears for alice', !!bobCard);
+check('C3 candidate card has no contact fields', bobCard && !('contactMethods' in bobCard) && !('value' in bobCard) && !('email' in bobCard) && !('phone' in bobCard));
+check('C4 self excluded', !r.data.candidates.some((c) => c.id === aliceId));
+check('C5 myInterest starts null', bobCard && bobCard.myInterest === null);
+
+// --- private interest: no leak until mutual ---
+r = await alice.call('POST', '/api/interests', { candidateId: bobId, interested: true });
+check('I1 alice selects bob privately', r.status === 200);
+r = await bob.call('GET', '/api/matches');
+check('I2 one-sided interest yields no match for bob', r.data.matches.length === 0);
+r = await alice.call('GET', '/api/matches');
+check('I3 one-sided interest yields no match for alice', r.data.matches.length === 0);
+r = await bob.call('POST', '/api/interests', { candidateId: aliceId, interested: true });
+check('I4 bob selects alice', r.status === 200);
+r = await alice.call('GET', '/api/matches');
+check('I5 mutual interest matches', r.data.matches.length === 1 && r.data.matches[0].candidateId === bobId);
+check('I6 match card has no contact fields', !('email' in (r.data.matches[0].card || {})));
+r = await alice.call('GET', '/api/candidates');
+check('I7 myInterest reflects own selection only', r.data.candidates.find((c) => c.id === bobId)?.myInterest === true);
+
+// --- study requests ---
+r = await bob.call('POST', '/api/study-requests', { title: 'חברותא בבבא קמא', topic: 'גמרא', description: 'פרק ב', learningLevel: 'intermediate', preferredModes: ['video'], availableDays: ['tue'] });
+check('S1 bob creates study request', r.status === 201, JSON.stringify(r.data));
+const srId = r.data?.id;
+r = await alice.call('GET', '/api/study-requests');
+check('S2 alice sees open request with owner name', r.data.studyRequests.some((s) => s.id === srId && s.ownerName === 'בוב'));
+r = await alice.call('PUT', `/api/study-requests/${srId}`, { status: 'closed' });
+check('S3 alice cannot edit bob request', r.status === 404 || r.status === 403);
+r = await bob.call('PUT', `/api/study-requests/${srId}`, { status: 'paused' });
+check('S4 bob edits own request', r.status === 200);
+r = await bob.call('PUT', `/api/study-requests/${srId}`, { status: 'open' });
+
+// --- connections + consent + contact disclosure ---
+r = await alice.call('POST', '/api/connections', { recipientId: bobId, studyRequestId: srId, message: 'נשמח לחברותא' });
+check('N1 alice requests connection', r.status === 201, JSON.stringify(r.data));
+const connId = r.data?.id;
+r = await alice.call('POST', '/api/connections', { recipientId: bobId, message: 'x' });
+check('N2 duplicate active pair rejected', r.status === 409);
+r = await alice.call('GET', `/api/connections/${connId}/contact`);
+check('N3 contact denied while pending', r.status === 403);
+r = await alice.call('POST', `/api/connections/${connId}/respond`, { decision: 'accepted' });
+check('N4 requester cannot accept own request', r.status === 403);
+r = await bob.call('POST', `/api/connections/${connId}/respond`, { decision: 'accepted' });
+check('N5 bob accepts', r.status === 200, JSON.stringify(r.data));
+r = await bob.call('POST', `/api/connections/${connId}/consent`, { consent: true });
+check('N6 bob consents', r.status === 200);
+r = await alice.call('GET', `/api/connections/${connId}/contact`);
+check('N7 contact denied with one-sided consent', r.status === 403);
+r = await alice.call('POST', `/api/connections/${connId}/consent`, { consent: true });
+check('N8 alice consents', r.status === 200);
+r = await alice.call('GET', `/api/connections/${connId}/contact`);
+check('N9 contact revealed after mutual consent', r.status === 200 && r.data.contactMethods.some((m) => m.value === '0501234567'), JSON.stringify(r.data));
+r = await bob.call('GET', `/api/connections/${connId}/contact`);
+check('N10 bob gets empty list (alice has no methods)', r.status === 200 && r.data.contactMethods.length === 0);
+r = await eve.call('GET', `/api/connections/${connId}/contact`);
+check('N11 third party denied contact', r.status === 403);
+r = await bob.call('POST', `/api/connections/${connId}/consent`, { consent: false });
+r = await alice.call('GET', `/api/connections/${connId}/contact`);
+check('N12 revoked consent closes disclosure', r.status === 403);
+r = await bob.call('POST', `/api/connections/${connId}/consent`, { consent: true });
+
+// --- blocks ---
+r = await alice.call('POST', '/api/blocks', { blockedId: eveId });
+check('B1 alice blocks eve', r.status === 201);
+r = await eve.call('GET', '/api/candidates');
+check('B2 eve no longer sees alice', !r.data.candidates.some((c) => c.id === aliceId));
+r = await alice.call('GET', '/api/candidates');
+check('B3 alice no longer sees eve', !r.data.candidates.some((c) => c.id === eveId));
+r = await eve.call('POST', '/api/connections', { recipientId: aliceId, message: 'hi' });
+check('B4 eve cannot request blocked alice', r.status === 403);
+r = await alice.call('POST', '/api/connections', { recipientId: eveId, message: 'hi' });
+check('B5 alice cannot request blocked eve', r.status === 403);
+r = await alice.call('DELETE', `/api/blocks/${eveId}`);
+check('B6 unblock works', r.status === 200);
+r = await eve.call('GET', '/api/candidates');
+check('B7 eve sees alice again after unblock', r.data.candidates.some((c) => c.id === aliceId));
+
+// --- reports ---
+r = await eve.call('POST', '/api/reports', { reportedUserId: bobId, reason: 'התנהגות פוגענית', details: 'פרטים' });
+check('R1 report accepted', r.status === 201);
+r = await eve.call('POST', '/api/reports', { reason: 'x', details: '' });
+check('R2 invalid report rejected', r.status === 400);
+
+// --- logout ---
+r = await alice.call('POST', '/api/auth/logout');
+check('L1 logout ok', r.status === 200);
+r = await alice.call('GET', '/api/me');
+check('L2 session gone after logout', r.status === 401);
+
+console.log(`PASS=${pass} FAIL=${fail}`);
+process.exit(fail ? 1 : 0);
