@@ -22,6 +22,7 @@ export const api = {
   providers: () => call('GET', '/api/auth/providers'),
   register: (b) => call('POST', '/api/auth/register', b),
   login: (b) => call('POST', '/api/auth/login', b),
+  demoLogin: (identity) => call('POST', '/api/auth/demo-login', { identity }),
   logout: () => call('POST', '/api/auth/logout'),
   me: () => call('GET', '/api/me'),
   deleteAccount: () => call('DELETE', '/api/me'),

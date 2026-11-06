@@ -102,7 +102,12 @@ function getApi(env) {
         adminUrl: env.HYPERDRIVE_ADMIN.connectionString,
         perRequest: true, // workerd tears sockets down between requests
       }),
-      env: { GOOGLE_SIGNIN_ENABLED: 'false' },
+      env: {
+        GOOGLE_SIGNIN_ENABLED: 'false',
+        // Synthetic preview demo entry. 'true' ONLY for this gated preview
+        // deployment; absent/false everywhere else = the route does not exist.
+        PREVIEW_DEMO_MODE: env.PREVIEW_DEMO_MODE === 'true' ? 'true' : 'false',
+      },
     });
   }
   return apiHandler;

@@ -42,6 +42,22 @@ export default function AuthScreen() {
   }
   const [busy, setBusy] = useState(false);
 
+  // Synthetic demo entry (gated preview only): rendered only when the server
+  // reports demo mode enabled. Two fixed seeded identities, no password.
+  async function demoSignIn(identity) {
+    setOauthBusy(true);
+    setError(null);
+    try {
+      await api.demoLogin(identity);
+      showToast(t('toastWelcome'));
+      await refreshMe();
+      navigate('find');
+    } catch {
+      setError(t('oauthStartFailed'));
+    }
+    setOauthBusy(false);
+  }
+
   async function submit(e) {
     e.preventDefault();
     setError(null);
@@ -178,6 +194,27 @@ export default function AuthScreen() {
           {busy ? t('busy') : mode === 'register' ? t('register') : t('login')}
         </button>
       </form>
+      {providers?.demo?.enabled && (
+        <div className="pt-4 space-y-2">
+          <p className="text-center text-[12px] font-semibold text-ink-2">{t('demoTitle')}</p>
+          <button
+            type="button"
+            onClick={() => demoSignIn('man')}
+            disabled={oauthBusy}
+            className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[15px] font-semibold text-ink disabled:opacity-60"
+          >
+            {t('demoMan')}
+          </button>
+          <button
+            type="button"
+            onClick={() => demoSignIn('woman')}
+            disabled={oauthBusy}
+            className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[15px] font-semibold text-ink disabled:opacity-60"
+          >
+            {t('demoWoman')}
+          </button>
+        </div>
+      )}
       {providers?.google?.enabled && providers.google.authUrl && (
         <div className="pt-4">
           <button

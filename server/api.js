@@ -225,6 +225,50 @@ route('POST', '/api/auth/logout', async (req, res) => {
   send(res, 200, { ok: true }, { 'set-cookie': 'dev_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
 });
 
+// ---------- synthetic preview demo entry (GATED PREVIEW ONLY) ----------
+// Enabled ONLY when ENV.PREVIEW_DEMO_MODE === 'true' AND authMode is not 'neon'
+// - so it can never exist in production vendor mode, and is off by default
+// everywhere. Exists because scrypt password hashing (~32ms CPU, measured on
+// local workerd 2026-11-06) exceeds the Workers Free 10ms CPU limit, so real
+// register/login cannot run on the free hosted runtime. Issues sessions for
+// TWO FIXED seeded synthetic identities only - no arbitrary userId, no
+// password (password login stays impossible for these rows), no real user
+// data. NEVER enable outside a gated synthetic preview.
+const DEMO_ENABLED = ENV.PREVIEW_DEMO_MODE === 'true' && AUTH_MODE !== 'neon';
+const DEMO_IDENTITIES = {
+  man: { email: 'demo.man@preview.synthetic', displayName: 'אברהם (דמו)', gender: 'man' },
+  woman: { email: 'demo.woman@preview.synthetic', displayName: 'שרה (דמו)', gender: 'woman' },
+};
+if (DEMO_ENABLED) {
+  route('POST', '/api/auth/demo-login', async (req, res) => {
+    if (rateLimited(`demo:${req.socket.remoteAddress}`, 30, 600_000)) return send(res, 429, { error: 'rate_limited' });
+    const body = await readBody(req);
+    const spec = DEMO_IDENTITIES[body.identity];
+    if (!spec) return send(res, 400, { error: 'invalid_input' });
+    const userId = await db.asService(async (c) => {
+      const { rows } = await c.query('select id from dev_auth.users where email = $1', [spec.email]);
+      if (rows.length) return rows[0].id;
+      const ins = await c.query(
+        'insert into dev_auth.users (email, password_hash) values ($1, $2) returning id',
+        [spec.email, 'demo-password-login-impossible']);
+      const id = ins.rows[0].id;
+      await c.query('insert into auth.users (id) values ($1) on conflict do nothing', [id]);
+      return id;
+    });
+    await db.withRls(userId, (c) => c.query(
+      `insert into public.profiles (id, display_name, gender, age_attested_at)
+         values ($1, $2, $3, now()) on conflict (id) do nothing`,
+      [userId, spec.displayName, spec.gender]));
+    const token = newSessionToken();
+    await db.asService((c) => c.query(
+      'insert into dev_auth.sessions (token, user_id, expires_at) values ($1, $2, $3)',
+      [token, userId, sessionExpiry()]));
+    send(res, 200, { userId, demo: true }, {
+      'set-cookie': `dev_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${14 * 24 * 3600}`,
+    });
+  });
+}
+
 // ---------- OAuth provider discovery (code prep; vendor config pending) ----------
 // Google sign-in for APP END-USERS (user decision 2026-11-06 11:59, wamid
 // HBgMOTcyNTI3NzA3NDQxFQIAEhgUM0FEQjAyM0NFQTk1...E2RjZENTkwMjhBRTk4MTUwMjgA).
@@ -235,6 +279,7 @@ route('POST', '/api/auth/logout', async (req, res) => {
 route('GET', '/api/auth/providers', async (req, res) => {
   send(res, 200, {
     email: { enabled: true },
+    demo: { enabled: DEMO_ENABLED },
     google: {
       enabled: ENV.GOOGLE_SIGNIN_ENABLED === 'true' && !!ENV.NEON_AUTH_URL,
       // Neon mode: same-origin proxy path so the vendor session cookie is

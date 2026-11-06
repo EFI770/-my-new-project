@@ -7,6 +7,11 @@ compatibility_flags = ["nodejs_compat"]
 # synthetic dev-auth accounts only, Google sign-in disabled at the API layer.
 [vars]
 PREVIEW_MODE = "private-synthetic"
+# Synthetic demo entry for THIS gated preview only (scrypt exceeds the Workers
+# Free 10ms CPU limit, so real register/login cannot run on the free runtime).
+# The route exists only when this is 'true' AND auth mode is not 'neon'.
+# REMOVE for any production deployment.
+PREVIEW_DEMO_MODE = "true"
 
 # run_worker_first: without it, requests matching a static file are served by
 # the assets layer BEFORE the worker runs - which would bypass the preview
