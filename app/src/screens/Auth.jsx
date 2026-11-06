@@ -60,6 +60,7 @@ export default function AuthScreen() {
           <button
             key={k}
             onClick={() => { setMode(k); setError(null); }}
+            aria-pressed={mode === k}
             className={`rounded-full py-2 text-[14px] ${mode === k ? 'bg-white font-semibold text-green-dark shadow-sm' : 'text-ink-2'}`}
           >
             {label}
@@ -128,7 +129,7 @@ export default function AuthScreen() {
           />
           {mode === 'register' && <span className="text-[11px] text-ink-2">{t('passwordHint')}</span>}
         </label>
-        {error && <div className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] text-[#991b1b]">{error}</div>}
+        {error && <div role="alert" className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] text-[#991b1b]">{error}</div>}
         <button
           type="submit"
           disabled={busy}

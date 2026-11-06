@@ -38,6 +38,8 @@ const STR = {
   he: {
     metaTitle: 'חברותא • כפר רתמים',
     loading: 'טוען…',
+    skipToContent: 'דלג לתוכן הראשי',
+    navLabel: 'ניווט ראשי',
     brand: 'חברותא',
     tagline: 'רתמים • פיילוט קהילתי',
     greeting: 'שלום, {name}',
@@ -192,6 +194,8 @@ const STR = {
   en: {
     metaTitle: 'Chavruta • Kfar Retamim',
     loading: 'Loading…',
+    skipToContent: 'Skip to main content',
+    navLabel: 'Main navigation',
     brand: 'Chavruta',
     tagline: 'Retamim • Community pilot',
     greeting: 'Hello, {name}',

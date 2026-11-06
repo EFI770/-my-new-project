@@ -59,7 +59,7 @@ function Shell() {
   }, []);
 
   if (me === undefined) {
-    return <div className="min-h-screen grid place-items-center text-ink-2">{t('loading')}</div>;
+    return <div role="status" className="min-h-screen grid place-items-center text-ink-2">{t('loading')}</div>;
   }
 
   const ctx = { me, refreshMe, showToast, navigate };
@@ -67,7 +67,7 @@ function Shell() {
   if (!me) {
     return (
       <AppCtx.Provider value={ctx}>
-        {route === 'auth' ? <AuthScreen /> : <Landing />}
+        <main id="main">{route === 'auth' ? <AuthScreen /> : <Landing />}</main>
         {toast && <Toast text={toast} />}
       </AppCtx.Provider>
     );
@@ -77,6 +77,7 @@ function Shell() {
   return (
     <AppCtx.Provider value={ctx}>
       <div className="mx-auto min-h-screen max-w-[920px] pb-24">
+        <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-lg focus:bg-green-dark focus:px-4 focus:py-2 focus:text-white">{t('skipToContent')}</a>
         <header className="flex items-center justify-between px-5 pt-5">
           <div>
             <div className="text-[20px] font-bold text-green-dark">{t('brand')}</div>
@@ -87,18 +88,19 @@ function Shell() {
             <LangSwitch />
           </div>
         </header>
-        <main className="px-5 pt-5">
+        <main id="main" tabIndex={-1} className="px-5 pt-5">
           {tab === 'find' && <Candidates />}
           {tab === 'requests' && <Requests />}
           {tab === 'connections' && <Connections />}
           {tab === 'me' && <Profile />}
         </main>
-        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e7e5e4] bg-white/90 backdrop-blur">
+        <nav aria-label={t('navLabel')} className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e7e5e4] bg-white/90 backdrop-blur">
           <div className="mx-auto grid max-w-[920px] grid-cols-4">
             {TABS.map((tb) => (
               <button
                 key={tb.key}
                 onClick={() => navigate(tb.key)}
+                aria-current={tab === tb.key ? 'page' : undefined}
                 className={`py-3 text-[13px] ${tab === tb.key ? 'font-semibold text-green-dark' : 'text-ink-2'}`}
               >
                 {tb.label}
@@ -122,7 +124,7 @@ export default function App() {
 
 export function Toast({ text }) {
   return (
-    <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full bg-green-dark px-5 py-2.5 text-[14px] text-white shadow-xl">
+    <div role="status" aria-live="polite" className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full bg-green-dark px-5 py-2.5 text-[14px] text-white shadow-xl">
       {text}
     </div>
   );
