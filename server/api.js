@@ -128,6 +128,10 @@ function route(method, pattern, handler) {
 // ---------- auth (dev-only) ----------
 route('POST', '/api/auth/register', async (req, res) => {
   if (rateLimited(`reg:${req.socket.remoteAddress}`, 10, 3600_000)) return send(res, 429, { error: 'rate_limited' });
+  // Gated synthetic preview: password auth is BLOCKED AT THE API here (not
+  // merely CPU-infeasible): scrypt exceeds the Workers Free 10ms CPU limit,
+  // so on this runtime register/login are disabled by construction.
+  if (DEMO_ENABLED) return send(res, 403, { error: 'demo_preview_only' });
   if (AUTH_MODE === 'neon') {
     // Vendor mode: the user already signed up with Neon Auth and presents its
     // JWT. We bind the verified `sub` to a new app user + profile. No password
@@ -197,6 +201,7 @@ route('POST', '/api/auth/register', async (req, res) => {
 
 route('POST', '/api/auth/login', async (req, res) => {
   if (AUTH_MODE === 'neon') return send(res, 400, { error: 'use_vendor_auth' });
+  if (DEMO_ENABLED) return send(res, 403, { error: 'demo_preview_only' });
   if (rateLimited(`login:${req.socket.remoteAddress}`, 20, 600_000)) return send(res, 429, { error: 'rate_limited' });
   const body = await readBody(req);
   const email = cleanStr(body.email, 254)?.toLowerCase();
@@ -278,7 +283,7 @@ if (DEMO_ENABLED) {
 // base URL is configured. No tokens or secrets here - the base URL is public.
 route('GET', '/api/auth/providers', async (req, res) => {
   send(res, 200, {
-    email: { enabled: true },
+    email: { enabled: !DEMO_ENABLED },
     demo: { enabled: DEMO_ENABLED },
     google: {
       enabled: ENV.GOOGLE_SIGNIN_ENABLED === 'true' && !!ENV.NEON_AUTH_URL,

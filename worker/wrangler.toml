@@ -33,3 +33,7 @@ localConnectionString = "postgresql://postgres:localdev@127.0.0.1:5432/chavruta_
 binding = "HYPERDRIVE_ADMIN"
 id = "780c7e8adff24094ad2ff1c6117d7200"
 localConnectionString = "postgresql://postgres:localdev@127.0.0.1:5432/chavruta_dev"
+
+# Per-invocation logs (incl. per-route CPU time) for preview verification.
+[observability]
+enabled = true

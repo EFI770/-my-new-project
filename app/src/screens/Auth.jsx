@@ -102,6 +102,8 @@ export default function AuthScreen() {
         {t('authPrivacy')}
       </div>
 
+      {!(providers?.demo?.enabled && providers?.email?.enabled === false) && (
+      <>
       <div className="mt-5 grid grid-cols-2 rounded-full bg-cream-2 p-1">
         {[['login', t('login')], ['register', t('register')]].map(([k, label]) => (
           <button
@@ -194,6 +196,11 @@ export default function AuthScreen() {
           {busy ? t('busy') : mode === 'register' ? t('register') : t('login')}
         </button>
       </form>
+      </>
+      )}
+      {providers?.demo?.enabled && providers?.email?.enabled === false && (
+        <p className="rounded-xl bg-cream-2 px-4 py-3 text-center text-[12px] leading-5 text-ink-2">{t('demoOnlyNote')}</p>
+      )}
       {providers?.demo?.enabled && (
         <div className="pt-4 space-y-2">
           <p className="text-center text-[12px] font-semibold text-ink-2">{t('demoTitle')}</p>

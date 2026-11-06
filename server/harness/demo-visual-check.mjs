@@ -37,6 +37,9 @@ const texts = await page.evaluate(() => document.body.innerText);
 check('demo title visible', texts.includes('תצוגת דמו סינתטית'));
 check('demo man button visible', texts.includes('כניסת דמו - גבר'));
 check('demo woman button visible', texts.includes('כניסת דמו - אישה'));
+check('demo-only note visible', texts.includes('ההרשמה וההתחברות עם סיסמה כבויות'));
+const pwdInputs = await page.evaluate(() => document.querySelectorAll('input[type=password], input[type=email]').length);
+check('password/email form hidden in demo mode', pwdInputs === 0, String(pwdInputs));
 
 // 3. Keyboard: both demo buttons are real buttons, focusable, with accessible names.
 const btnInfo = await page.evaluate(() => {
