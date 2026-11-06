@@ -28,7 +28,7 @@ export function LangSwitch() {
     <button
       onClick={() => setLang(lang === 'he' ? 'en' : 'he')}
       className="rounded-full border border-[#e7e5e4] bg-white px-3 py-1.5 text-[12px] font-medium text-ink-2"
-      aria-label="Switch language / החלפת שפה"
+      aria-label={lang === 'he' ? 'EN - Switch language to English' : 'עב - מעבר לשפה עברית'}
     >
       {lang === 'he' ? 'EN' : 'עב'}
     </button>
@@ -58,6 +58,11 @@ function Shell() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  // Hooks must run unconditionally (before any early return).
+  const mainRef = React.useRef(null);
+  const tab = TABS.some((tb) => tb.key === route) ? route : 'find';
+  useEffect(() => { if (me) mainRef.current?.focus({ preventScroll: true }); }, [tab, me]);
+
   if (me === undefined) {
     return <div role="status" className="min-h-screen grid place-items-center text-ink-2">{t('loading')}</div>;
   }
@@ -73,9 +78,6 @@ function Shell() {
     );
   }
 
-  const tab = TABS.some((tb) => tb.key === route) ? route : 'find';
-  const mainRef = React.useRef(null);
-  useEffect(() => { mainRef.current?.focus({ preventScroll: true }); }, [tab]);
   return (
     <AppCtx.Provider value={ctx}>
       <div className="mx-auto min-h-screen max-w-[920px] pb-24">

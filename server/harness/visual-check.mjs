@@ -24,7 +24,7 @@ async function apiCall(method, path, body, cookie) {
 }
 
 // Seed user B via API (profile + contact + interest in A happens later)
-let r = await apiCall('POST', '/api/auth/register', { email: B.email, password: PW, displayName: B.name, gender: 'woman' });
+let r = await apiCall('POST', '/api/auth/register', { email: B.email, password: PW, displayName: B.name, gender: 'woman', attestAdult: true });
 const bCookie = r.cookie; const bId = r.data?.userId;
 await apiCall('PUT', '/api/me/profile', {
   displayName: B.name, bio: 'מחפשת חברותא נעימה לפרשת שבוע', learningTopics: ['פרשת שבוע', 'גמרא'],
@@ -59,9 +59,9 @@ await page.waitForSelector('input[placeholder="למשל: יעקב כהן"]');
 await page.type('input[placeholder="למשל: יעקב כהן"]', A.name);
 await page.evaluate(() => [...document.querySelectorAll('form button[type="button"]')].find((b) => b.textContent.trim() === 'אישה')?.click());
 check('V2b gender selected in UI', await page.evaluate(() => [...document.querySelectorAll('form button[type="button"]')].some((b) => b.textContent.trim() === 'אישה' && b.getAttribute('aria-pressed') === 'true')));
-const inputs = await page.$$('form input');
-await inputs[1].type(A.email);
-await inputs[2].type(PW);
+await page.evaluate(() => { const c = document.querySelector('form input[type="checkbox"]'); if (c && !c.checked) c.click(); }); // 18+ attestation (required)
+await page.type('form input[type="email"]', A.email);
+await page.type('form input[type="password"]', PW);
 await page.evaluate(() => document.querySelector('form button[type="submit"]')?.click());
 await page.waitForFunction(() => document.body.textContent.includes('מועמדים'), { timeout: 8000 });
 check('V3 registered and landed on candidates', true);
@@ -143,7 +143,7 @@ await new Promise((r) => setTimeout(r, 500));
 check('V11a English switches direction to LTR', await page.evaluate(() => document.documentElement.dir === 'ltr' && document.documentElement.lang === 'en'));
 check('V11b English UI strings render', await page.evaluate(() => document.body.textContent.includes('Connections')));
 await page.screenshot({ path: `${SHOT_DIR}/rebuild-08-english.png` });
-await page.evaluate(() => document.querySelector('button[aria-label*="Switch language"]')?.click());
+await page.evaluate(() => document.querySelector('button[aria-label*="מעבר לשפה"]')?.click());
 await new Promise((r) => setTimeout(r, 500));
 check('V12 switching back restores RTL Hebrew', await page.evaluate(() => document.documentElement.dir === 'rtl' && document.body.textContent.includes('חיבורים')));
 
