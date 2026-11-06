@@ -100,6 +100,7 @@ function getApi(env) {
       db: createDb({
         appUrl: env.HYPERDRIVE_APP.connectionString,
         adminUrl: env.HYPERDRIVE_ADMIN.connectionString,
+        perRequest: true, // workerd tears sockets down between requests
       }),
       env: { GOOGLE_SIGNIN_ENABLED: 'false' },
     });

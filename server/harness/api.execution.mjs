@@ -1,6 +1,8 @@
 // End-to-end execution tests: HTTP -> dev emulator -> real Postgres RLS/RPCs.
 // Run via scripts/test-api-local.sh (expects BASE env).
 const BASE = process.env.BASE || 'http://127.0.0.1:4591';
+// Optional gate header for running against the gated worker preview runtime.
+const GATE = process.env.PREVIEW_GATE_HEADER || '';
 let pass = 0, fail = 0;
 function check(name, cond, extra = '') {
   if (cond) { console.log(`ok - ${name}`); pass++; }
@@ -12,7 +14,7 @@ function jar() {
     async call(method, path, body) {
       const res = await fetch(BASE + path, {
         method,
-        headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+        headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}), ...(GATE ? { 'x-preview-gate': GATE } : {}) },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
       const setC = res.headers.get('set-cookie');
@@ -247,12 +249,12 @@ check('D4 deleted user cannot login', r.status === 401);
 r = await alice.call('PUT', '/api/me/profile', { displayName: 'א'.repeat(81), bio: '', learningTopics: [], learningLevel: null, preferredModes: [], availableDays: [], availabilityNotes: '' });
 check('X1 oversized display name rejected', r.status === 400);
 {
-  const raw = await fetch(BASE + '/api/me/profile', { method: 'PUT', headers: { 'content-type': 'text/plain', cookie: '' }, body: 'displayName=x' });
+  const raw = await fetch(BASE + '/api/me/profile', { method: 'PUT', headers: { 'content-type': 'text/plain', cookie: '', ...(GATE ? { 'x-preview-gate': GATE } : {}) }, body: 'displayName=x' });
   check('X2 non-JSON body rejected', raw.status === 400 || raw.status === 401);
   let huge = 'x'.repeat(70 * 1024);
-  const raw2 = await fetch(BASE + '/api/me/profile', { method: 'PUT', headers: { 'content-type': 'application/json', cookie: alice.cookie }, body: JSON.stringify({ displayName: huge }) });
+  const raw2 = await fetch(BASE + '/api/me/profile', { method: 'PUT', headers: { 'content-type': 'application/json', cookie: alice.cookie, ...(GATE ? { 'x-preview-gate': GATE } : {}) }, body: JSON.stringify({ displayName: huge }) });
   check('X3 oversized payload rejected', raw2.status === 413 || raw2.status === 400, `status=${raw2.status}`);
-  const raw3 = await fetch(BASE + '/api/interests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{not json' });
+  const raw3 = await fetch(BASE + '/api/interests', { method: 'POST', headers: { 'content-type': 'application/json', ...(GATE ? { 'x-preview-gate': GATE } : {}) }, body: '{not json' });
   check('X4 malformed JSON rejected', raw3.status === 400 || raw3.status === 401);
 }
 // XSS-shaped input is stored as data (React escapes on render) but must not break API

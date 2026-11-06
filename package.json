@@ -9,5 +9,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "wrangler": "^4.158.0"
   }
 }

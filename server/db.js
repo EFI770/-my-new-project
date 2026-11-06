@@ -7,7 +7,7 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
-export function createDb({ socketDir, database, appUrl, adminUrl }) {
+export function createDb({ socketDir, database, appUrl, adminUrl, perRequest }) {
   // Two modes:
   // - local dev emulator: socket connection as local superuser (bootstrap/DDL),
   //   SET ROLE authenticated for user traffic (same as Neon mode).
@@ -20,6 +20,35 @@ export function createDb({ socketDir, database, appUrl, adminUrl }) {
   const app = appUrl || process.env.DATABASE_APP_URL;
   const admin = adminUrl || process.env.DATABASE_ADMIN_URL || app;
   const neon = !!app;
+
+  // Hosted runtimes (Cloudflare Workers) tear down sockets when a request
+  // completes, so an idle pooled connection from a previous request is dead
+  // on the next one. perRequest mode opens a fresh client per logical
+  // operation and closes it in the same request - the documented pattern for
+  // pg-over-Hyperdrive (Hyperdrive does the upstream pooling at the edge).
+  if (perRequest) {
+    const open = (connectionString) => async (fn) => {
+      const client = new pg.Client({ connectionString });
+      await client.connect();
+      try { return await fn(client); } finally { await client.end().catch(() => {}); }
+    };
+    const withRls = (userId, fn) => open(app)(async (client) => {
+      try {
+        await client.query('begin');
+        await client.query('set local role authenticated');
+        await client.query(`select set_config('app.sub', $1, true)`, [String(userId)]);
+        const result = await fn(client);
+        await client.query('commit');
+        return result;
+      } catch (err) {
+        await client.query('rollback').catch(() => {});
+        throw err;
+      }
+    });
+    const asService = open(admin);
+    return { pool: null, withRls, asService };
+  }
+
   const pool = neon
     ? new Pool({ connectionString: app, max: Number(process.env.PGPOOL_MAX || 5) })
     : new Pool({ host: socketDir, database, user: 'postgres', max: 5 });
