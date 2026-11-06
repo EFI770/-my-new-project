@@ -91,12 +91,24 @@ function shimRes() {
   return { res, toResponse };
 }
 
+function authModeIsNeon(env) {
+  return env.AUTH_MODE === 'neon';
+}
+
 // ---------- API handler: one per isolate, configured from env ----------
 let apiHandler = null;
 function getApi(env) {
   if (!apiHandler) {
+    // Auth mode is env-switched: 'dev' = synthetic preview accounts (current
+    // gated preview), 'neon' = vendor Google sign-in (community build). The
+    // preview deployment ships with AUTH_MODE unset/'dev'; the community
+    // deploy sets AUTH_MODE=neon plus the Neon Auth values.
+    const authMode = env.AUTH_MODE === 'neon' ? 'neon' : 'dev';
     apiHandler = createApiHandler({
-      authMode: 'dev', // synthetic preview: app-level email/password accounts
+      authMode,
+      neonJwksUrl: env.NEON_AUTH_JWKS_URL,
+      neonIssuer: env.NEON_AUTH_ISSUER,
+      neonAudience: env.NEON_AUTH_AUDIENCE || undefined,
       db: createDb({
         appUrl: env.HYPERDRIVE_APP.connectionString,
         adminUrl: env.HYPERDRIVE_ADMIN.connectionString,
@@ -104,6 +116,7 @@ function getApi(env) {
       }),
       env: {
         GOOGLE_SIGNIN_ENABLED: 'false',
+        NEON_AUTH_URL: env.NEON_AUTH_URL || '',
         // Synthetic preview demo entry. 'true' ONLY for this gated preview
         // deployment; absent/false everywhere else = the route does not exist.
         PREVIEW_DEMO_MODE: env.PREVIEW_DEMO_MODE === 'true' ? 'true' : 'false',
@@ -140,7 +153,7 @@ export default {
       return gatePage(403);
     }
 
-    if (url.pathname.startsWith('/api/')) {
+    if (url.pathname.startsWith('/api/') || (authModeIsNeon(env) && url.pathname.startsWith('/vendor-auth/'))) {
       const bodyText = ['GET', 'HEAD'].includes(request.method) ? '' : await request.text();
       const req = shimReq(request, bodyText);
       const { res, toResponse } = shimRes();
