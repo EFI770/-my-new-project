@@ -17,12 +17,35 @@ const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome
 const page = await browser.newPage();
 await page.goto(BASE + '/#/auth', { waitUntil: 'networkidle0' });
 await new Promise((r) => setTimeout(r, 800));
-const btn = await page.evaluate(() => { const a = [...document.querySelectorAll('a')].find((e) => e.href.includes('sign-in/social')); return a ? { text: a.textContent.trim(), href: a.href } : null; });
-check(`Google button ${EXPECT ? 'rendered' : 'NOT rendered'}`, EXPECT ? !!btn : btn === null, JSON.stringify(btn));
+const btn = await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.includes('Google')); return b ? b.textContent.trim() : null; });
+check(`Google button ${EXPECT ? 'rendered' : 'NOT rendered'}`, EXPECT ? !!btn : btn === null, String(btn));
 if (EXPECT && btn) {
-  check('button text localized', btn.text.includes('Google'), btn.text);
-  const u = new URL(btn.href);
-  check('button targets vendor social endpoint', u.pathname.endsWith('/sign-in/social') && u.searchParams.get('provider') === 'google' && !!u.searchParams.get('callbackURL'), btn.href);
+  check('button text localized', btn.includes('Google'), btn);
+  // intercept the vendor POST and the redirect target; assert POST shape + navigation
+  await page.setRequestInterception(true);
+  const seen = { post: null };
+  page.on('request', (req) => {
+    const u = req.url();
+    if (u.includes('/sign-in/social')) {
+      if (req.method() === 'OPTIONS') {
+        req.respond({ status: 204, headers: {
+          'access-control-allow-origin': req.headers()['origin'] || '*',
+          'access-control-allow-methods': 'POST, OPTIONS',
+          'access-control-allow-headers': 'content-type',
+          'access-control-max-age': '600',
+        }, body: '' });
+      } else {
+        seen.post = { method: req.method(), body: req.postData() };
+        req.respond({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': req.headers()['origin'] || '*' }, body: JSON.stringify({ url: 'https://oauth-init.invalid/start', redirect: true }) });
+      }
+    } else if (u.startsWith('https://oauth-init.invalid/')) {
+      req.respond({ status: 200, contentType: 'text/html', body: '<title>init</title>' });
+    } else { req.continue(); }
+  });
+  await page.evaluate(() => { [...document.querySelectorAll('button')].find((e) => e.textContent.includes('Google'))?.click(); });
+  await new Promise((r) => setTimeout(r, 2500));
+  check('button POSTs to vendor social endpoint', seen.post?.method === 'POST' && seen.post.body?.includes('"provider":"google"') && seen.post.body?.includes('callbackURL'), JSON.stringify(seen.post));
+  check('browser follows the returned init URL', page.url().startsWith('https://oauth-init.invalid/'), page.url());
 }
 await browser.close();
 console.log(`PASS=${pass} FAIL=${fail}`);

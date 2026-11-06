@@ -17,7 +17,29 @@ export default function AuthScreen() {
   // Google sign-in for app users (owner decision): rendered only when the
   // server reports the vendor provider configured. Disabled by default.
   const [providers, setProviders] = useState(null);
+  const [oauthBusy, setOauthBusy] = useState(false);
   useEffect(() => { api.providers().then(setProviders).catch(() => {}); }, []);
+
+  // Neon Auth (Better Auth) social flow is POST-then-redirect: the endpoint
+  // returns {url} and the browser must navigate there. Verified against the
+  // live vendor 2026-11-06 (GET on the endpoint is 404; POST returns init URL).
+  async function googleSignIn() {
+    setOauthBusy(true);
+    setError(null);
+    try {
+      const r = await fetch(`${providers.google.authUrl}/sign-in/social`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: 'google', callbackURL: `${window.location.origin}/#/auth` }),
+      });
+      const data = await r.json().catch(() => null);
+      if (r.ok && data?.url) { window.location.assign(data.url); return; }
+      setError(t('oauthStartFailed'));
+    } catch {
+      setError(t('oauthStartFailed'));
+    }
+    setOauthBusy(false);
+  }
   const [busy, setBusy] = useState(false);
 
   async function submit(e) {
@@ -158,12 +180,14 @@ export default function AuthScreen() {
       </form>
       {providers?.google?.enabled && providers.google.authUrl && (
         <div className="pt-4">
-          <a
-            href={`${providers.google.authUrl}/sign-in/social?provider=google&callbackURL=${encodeURIComponent(window.location.origin + '/#/auth')}`}
-            className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[15px] font-semibold text-ink"
+          <button
+            type="button"
+            onClick={googleSignIn}
+            disabled={oauthBusy}
+            className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[15px] font-semibold text-ink disabled:opacity-60"
           >
             {t('continueWithGoogle')}
-          </a>
+          </button>
         </div>
       )}
     </div>

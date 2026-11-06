@@ -112,7 +112,7 @@ function Shell() {
                 key={tb.key}
                 onClick={() => navigate(tb.key)}
                 aria-current={tab === tb.key ? 'page' : undefined}
-                className={`py-3 text-[13px] ${tab === tb.key ? 'font-semibold text-green-dark' : 'text-ink-2'}`}
+                className={`min-h-[48px] px-1 py-2.5 text-[13px] leading-tight ${tab === tb.key ? 'font-semibold text-green-dark' : 'text-ink-2'}`}
               >
                 {tb.label}
               </button>
