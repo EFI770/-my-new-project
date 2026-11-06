@@ -576,7 +576,10 @@ function serveStatic(req, res) {
   res.end(fs.readFileSync(file));
 }
 
-const server = http.createServer(async (req, res) => {
+// Request handler is exported so the same code can run as a long-lived
+// local listener (dev) or be invoked per-request by a serverless runtime
+// (hosted preview). Local behavior is unchanged.
+const handler = async (req, res) => {
   try {
     const url = (req.url || '').split('?')[0];
     if (!url.startsWith('/api/')) return serveStatic(req, res);
@@ -608,6 +611,11 @@ const server = http.createServer(async (req, res) => {
     console.error(err);
     send(res, 500, { error: 'internal_error' });
   }
-});
+};
 
-server.listen(PORT, () => console.log(`dev emulator on :${PORT} (db: ${DATABASE} via ${SOCKET_DIR})`));
+const server = http.createServer(handler);
+if (!process.env.VERCEL) {
+  server.listen(PORT, () => console.log(`dev emulator on :${PORT} (db: ${DATABASE} via ${SOCKET_DIR})`));
+}
+
+export default handler;

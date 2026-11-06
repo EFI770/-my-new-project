@@ -1,0 +1,5 @@
+{
+  "$comment": "DEPLOY PREP ONLY. All traffic (API + static frontend) routes through the single Node function. Env vars required at deploy time (never committed): CHAVRUTA_AUTH_MODE=neon, DATABASE_APP_URL (Neon pooler), NEON_AUTH_JWKS_URL, NEON_AUTH_ISSUER, NEON_AUTH_AUDIENCE, NEON_AUTH_URL. Preview must have Vercel Authentication enabled before first deploy.",
+  "version": 2,
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+}
