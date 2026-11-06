@@ -338,7 +338,10 @@ if (DEMO_ENABLED) {
 // base URL is configured. No tokens or secrets here - the base URL is public.
 route('GET', '/api/auth/providers', async (req, res) => {
   send(res, 200, {
-    email: { enabled: !DEMO_ENABLED },
+    // Community mode defaults to Google-only registration (owner's expressed
+    // preference 2026-11-06 11:59 IST); EMAIL_AUTH_ENABLED=true opts back in.
+    // Dev emulator keeps email/password for local testing.
+    email: { enabled: !DEMO_ENABLED && (AUTH_MODE !== 'neon' || ENV.EMAIL_AUTH_ENABLED === 'true') },
     demo: { enabled: DEMO_ENABLED },
     google: {
       enabled: ENV.GOOGLE_SIGNIN_ENABLED === 'true' && !!ENV.NEON_AUTH_URL,
@@ -433,8 +436,11 @@ route('DELETE', '/api/me', async (req, res, user) => {
   // reports ABOUT the user keep null user reference.
   let authSub = null;
   await db.asService(async (c) => {
-    const { rows } = await c.query('select auth_sub from auth.users where id = $1', [user.id]);
-    authSub = rows[0] && rows[0].auth_sub || null;
+    if (AUTH_MODE === 'neon') {
+      // auth_sub exists only where the vendor binding migration (0005) ran.
+      const { rows } = await c.query('select auth_sub from auth.users where id = $1', [user.id]);
+      authSub = rows[0] && rows[0].auth_sub || null;
+    }
     await c.query('delete from auth.users where id = $1', [user.id]);
     if (AUTH_MODE !== 'neon') await c.query('delete from dev_auth.users where id = $1', [user.id]);
   });
@@ -467,13 +473,16 @@ route('DELETE', '/api/me', async (req, res, user) => {
 // ---------- candidates & private interest ----------
 route('GET', '/api/candidates', async (req, res, user) => {
   const data = await db.withRls(user.id, async (c) => {
-    // RLS excludes profiles blocked in either direction.
+    // RLS excludes profiles blocked in either direction. Single round trip:
+    // the viewer's interest is joined in instead of a second query (Workers
+    // CPU budget - every round trip through the pool costs).
     const profiles = await c.query(
-      `select id, display_name, bio, learning_topics, learning_level, preferred_modes, available_days
-         from public.profiles where id <> $1`, [user.id]);
-    const mine = await c.query(
-      'select candidate_id, interested from public.interest_selections where viewer_id = $1', [user.id]);
-    const myMap = new Map(mine.rows.map((r) => [r.candidate_id, r.interested]));
+      `select p.id, p.display_name, p.bio, p.learning_topics, p.learning_level, p.preferred_modes, p.available_days,
+              s.interested as my_interest
+         from public.profiles p
+         left join public.interest_selections s
+           on s.viewer_id = $1 and s.candidate_id = p.id
+        where p.id <> $1`, [user.id]);
     return profiles.rows.map((p) => ({
       id: p.id,
       displayName: p.display_name,
@@ -482,7 +491,7 @@ route('GET', '/api/candidates', async (req, res, user) => {
       learningLevel: p.learning_level,
       preferredModes: p.preferred_modes,
       availableDays: p.available_days,
-      myInterest: myMap.has(p.id) ? myMap.get(p.id) : null,
+      myInterest: p.my_interest ?? null,
     }));
   });
   send(res, 200, { candidates: data });
