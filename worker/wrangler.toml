@@ -1,0 +1,24 @@
+name = "chavruta-preview"
+main = "index.js"
+compatibility_date = "2026-11-06"
+compatibility_flags = ["nodejs_compat"]
+
+# Private preview: fail-closed app-level gate (PREVIEW_GATE_KEY secret),
+# synthetic dev-auth accounts only, Google sign-in disabled at the API layer.
+[vars]
+PREVIEW_MODE = "private-synthetic"
+
+[assets]
+directory = "../app/dist"
+binding = "ASSETS"
+
+# Hyperdrive -> existing Neon chavruta-dev branch. Config IDs are filled at
+# deploy time (wrangler hyperdrive create), after the account exists.
+# chavruta_app role (least privilege, no BYPASSRLS) for all user traffic.
+# [[hyperdrive]]
+# binding = "HYPERDRIVE_APP"
+# id = "FILL_AT_DEPLOY"
+# neondb_owner, used only for bootstrap/binding writes (service-role mirror).
+# [[hyperdrive]]
+# binding = "HYPERDRIVE_ADMIN"
+# id = "FILL_AT_DEPLOY"
