@@ -108,6 +108,10 @@ await page.type('textarea', 'נשמח לחברותא בפרשת שבוע');
 await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'שליחת בקשת חיבור' && b.closest('div.pt-3'))?.click());
 await page.waitForFunction(() => document.body.textContent.includes('בקשת החיבור נשלחה') || document.body.textContent.includes('יוצאת'), { timeout: 8000 });
 check('V8 connection request sent from UI', true);
+// accept is distinct from consent: while the request is pending, the consent UI must not exist
+await page.evaluate(() => [...document.querySelectorAll('nav button')].find((b) => b.textContent.includes('חיבורים'))?.click());
+await page.waitForFunction(() => document.body.textContent.includes('ממתין'), { timeout: 8000 });
+check('V8b pending card shows no consent checkbox', await page.evaluate(() => ![...document.querySelectorAll('label')].some((l) => l.textContent.includes('מסכים'))));
 
 // 7. B accepts + both consent via API; A reveals contact in UI
 const bConns = await apiCall('GET', '/api/connections', undefined, bCookie);
@@ -117,6 +121,7 @@ await apiCall('POST', `/api/connections/${conn.id}/consent`, { consent: true }, 
 await page.reload({ waitUntil: 'networkidle0' });
 await page.evaluate(() => [...document.querySelectorAll('nav button')].find((b) => b.textContent.includes('חיבורים'))?.click());
 await page.waitForFunction(() => document.body.textContent.includes('מאושר'), { timeout: 8000 });
+check('V8c accepted card shows the separate consent checkbox', await page.evaluate(() => [...document.querySelectorAll('label')].some((l) => l.textContent.includes('מסכים'))));
 await page.evaluate(() => {
   const box = [...document.querySelectorAll('label')].find((l) => l.textContent.includes('מסכים'));
   box?.querySelector('input')?.click();

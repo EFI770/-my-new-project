@@ -122,20 +122,26 @@ check "G19 genderless user sees no requests" "0" "$out"
 out=$(run_as dave "$DAVE" "update public.profiles set gender = 'other' where id = '$DAVE';")
 check "G20 invalid gender rejected by check" "violates check constraint" "$out"
 
-# G21-G26: gender change severs connections, consents, interests, matches
-run_as alice "$ALICE" "update public.profiles set gender = 'man' where id = '$ALICE';" >/dev/null
+# G21-G28: gender is immutable once set (provisional fail-closed policy);
+# existing ties stay fully intact; first-time NULL->value set is allowed
+out=$(run_as alice "$ALICE" "update public.profiles set gender = 'man' where id = '$ALICE';")
+check "G21 gender change rejected" "Gender change is not permitted" "$out"
+out=$(psql -h "$SOCK" -U postgres -d "$DB" -qAt -c "select gender from public.profiles where id = '$ALICE';")
+check "G22 gender unchanged after rejected update" "woman" "$out"
 out=$(psql -h "$SOCK" -U postgres -d "$DB" -qAt -c "select status, requester_contact_consent, recipient_contact_consent from public.connection_requests where id = '$REQID';")
-check "G21 change cancels accepted connection + clears consents" "cancelled|f|f" "$out"
-out=$(psql -h "$SOCK" -U postgres -d "$DB" -qAt -c "select count(*) from public.interest_selections where viewer_id in ('$ALICE','$CAROL') or candidate_id in ('$ALICE','$CAROL');")
-check "G22 change deletes interest selections both directions" "0" "$out"
-out=$(run_as carol "$CAROL" "select count(*) from public.list_my_matches();")
-check "G23 no match survives the change" "0" "$out"
-out=$(run_as carol "$CAROL" "select kind from public.get_connection_contact('$REQID');")
-check "G24 contact denied after change" "Contact not available" "$out"
+check "G23 accepted connection + consents intact" "accepted|t|t" "$out"
+out=$(run_as carol "$CAROL" "select candidate_id from public.list_my_matches();")
+check "G24 mutual match intact" "$ALICE" "$out"
+out=$(run_as alice "$ALICE" "select value from public.get_connection_contact('$REQID');")
+check "G25 contact disclosure still works" "050-0000000" "$out"
 out=$(run_as alice "$ALICE" "select count(*) from public.profiles where id = '$CAROL';")
-check "G25 alice no longer sees carol" "0" "$out"
-out=$(run_as alice "$ALICE" "select count(*) from public.profiles where id in ('$BOB','$DAVE');")
-check "G26 alice now sees the men" "2" "$out"
+check "G26 same-gender visibility intact" "1" "$out"
+out=$(run_as alice "$ALICE" "update public.profiles set gender = 'woman' where id = '$ALICE'; select gender from public.profiles where id = '$ALICE';")
+check "G27 same-gender no-op update allowed" "woman" "$out"
+out=$(run_as noam "$NOAM" "update public.profiles set gender = 'man' where id = '$NOAM'; select count(*) from public.profiles where id in ('$BOB','$DAVE');")
+check "G28 first-time gender set allowed + opens same-gender visibility" "2" "$out"
+out=$(run_as noam "$NOAM" "update public.profiles set gender = 'woman' where id = '$NOAM';")
+check "G29 second change also rejected" "Gender change is not permitted" "$out"
 
 echo "PASS=$pass FAIL=$fail"
 [ "$fail" -eq 0 ]

@@ -203,17 +203,24 @@ route('PUT', '/api/me/profile', async (req, res, user) => {
   if (body.gender !== undefined && !GENDERS.has(body.gender)) {
     return send(res, 400, { error: 'invalid_gender' });
   }
-  await db.withRls(user.id, async (c) => {
+  const outcome = await db.withRls(user.id, async (c) => {
+    if (body.gender !== undefined) {
+      const cur = await c.query('select gender from public.profiles where id = $1', [user.id]);
+      // Gender is immutable once set (provisional policy, migration 0004):
+      // only a first-time set (NULL -> value) may pass; the DB trigger
+      // rejects any other change on every path.
+      if (cur.rows[0]?.gender && cur.rows[0].gender !== body.gender) return 'gender_immutable';
+    }
     await c.query(
       `update public.profiles set display_name=$2, bio=$3, learning_topics=$4, learning_level=$5,
          preferred_modes=$6, available_days=$7, availability_notes=$8, updated_at=now() where id=$1`,
       [user.id, displayName, bio, topics, level, modes, days, notes]);
-    // A gender change severs all existing connections and interest selections
-    // (AFTER UPDATE trigger in migration 0004) so no cross-gender tie survives.
     if (body.gender !== undefined) {
-      await c.query('update public.profiles set gender=$2, updated_at=now() where id=$1', [user.id, body.gender]);
+      await c.query('update public.profiles set gender=$2, updated_at=now() where id=$1 and gender is null', [user.id, body.gender]);
     }
+    return 'ok';
   });
+  if (outcome === 'gender_immutable') return send(res, 400, { error: 'gender_immutable' });
   send(res, 200, { ok: true });
 });
 

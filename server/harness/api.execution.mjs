@@ -104,7 +104,7 @@ r = await bob.call('POST', '/api/interests', { candidateId: aliceId, interested:
 check('I4 bob selects alice', r.status === 200);
 r = await alice.call('GET', '/api/matches');
 check('I5 mutual interest matches', r.data.matches.length === 1 && r.data.matches[0].candidateId === bobId);
-check('I6 match card has no contact fields', !('email' in (r.data.matches[0].card || {})));
+check('I6 match card has no contact fields', !('email' in (r.data.matches[0].card || {})) && !('contactMethods' in (r.data.matches[0].card || {})) && !('phone' in (r.data.matches[0].card || {})) && !('value' in (r.data.matches[0].card || {})));
 r = await alice.call('GET', '/api/candidates');
 check('I7 myInterest reflects own selection only', r.data.candidates.find((c) => c.id === bobId)?.myInterest === true);
 
@@ -114,6 +114,7 @@ check('S1 bob creates study request', r.status === 201, JSON.stringify(r.data));
 const srId = r.data?.id;
 r = await alice.call('GET', '/api/study-requests');
 check('S2 alice sees open request with owner name', r.data.studyRequests.some((s) => s.id === srId && s.ownerName === 'בוב'));
+check('S2b study-request payload has no contact fields', r.data.studyRequests.every((x) => !('contactMethods' in x) && !('email' in x) && !('phone' in x) && !('value' in x)));
 r = await alice.call('PUT', `/api/study-requests/${srId}`, { status: 'closed' });
 check('S3 alice cannot edit bob request', r.status === 404 || r.status === 403);
 r = await bob.call('PUT', `/api/study-requests/${srId}`, { status: 'paused' });
@@ -126,6 +127,8 @@ check('N1 alice requests connection', r.status === 201, JSON.stringify(r.data));
 const connId = r.data?.id;
 r = await alice.call('POST', '/api/connections', { recipientId: bobId, message: 'x' });
 check('N2 duplicate active pair rejected', r.status === 409);
+r = await bob.call('POST', `/api/connections/${connId}/consent`, { consent: true });
+check('N2b consent impossible while pending (accept != consent)', r.status === 403, JSON.stringify(r));
 r = await alice.call('GET', `/api/connections/${connId}/contact`);
 check('N3 contact denied while pending', r.status === 403);
 r = await alice.call('POST', `/api/connections/${connId}/respond`, { decision: 'accepted' });
@@ -183,28 +186,22 @@ r = await dana.call('GET', '/api/study-requests');
 check('GS5c dana sees own request but no men requests', r.data.studyRequests.some((x) => x.id === danaSrId) && !r.data.studyRequests.some((x) => x.id === srId));
 r = await bob.call('PUT', '/api/me/profile', { displayName: 'בוב', bio: 'x', learningTopics: [], learningLevel: null, preferredModes: [], availableDays: [], availabilityNotes: '', gender: 'other' });
 check('GS6 invalid gender change rejected', r.status === 400 && r.data?.error === 'invalid_gender');
-// bob becomes 'woman': the accepted alice<->bob connection and the mutual match must die
+// gender is immutable once set (provisional fail-closed policy): the attempt
+// is rejected and every existing tie stays fully intact
 r = await bob.call('PUT', '/api/me/profile', { displayName: 'בוב', bio: 'לומד גמרא', learningTopics: ['גמרא'], learningLevel: 'intermediate', preferredModes: ['video'], availableDays: ['sun', 'tue'], availabilityNotes: '', gender: 'woman' });
-check('GS7 bob changes gender', r.status === 200, JSON.stringify(r.data));
+check('GS7 gender change rejected fail-closed', r.status === 400 && r.data?.error === 'gender_immutable', JSON.stringify(r));
 r = await alice.call('GET', '/api/matches');
-check('GS8 match with bob severed after change', r.data.matches.length === 0);
+check('GS8 match with bob intact after rejected change', r.data.matches.length === 1 && r.data.matches[0].candidateId === bobId);
 r = await alice.call('GET', `/api/connections/${connId}/contact`);
-check('GS9 contact denied after gender change', r.status === 403);
+check('GS9 contact still available after rejected change', r.status === 200 && r.data.contactMethods.some((m) => m.value === '0500000000'));
 r = await alice.call('GET', '/api/connections');
-check('GS10 connection shows cancelled', r.data.connections.find((c) => c.id === connId)?.status === 'cancelled', JSON.stringify(r.data.connections));
+check('GS10 connection still accepted', r.data.connections.find((c) => c.id === connId)?.status === 'accepted');
 r = await alice.call('GET', '/api/candidates');
-check('GS11 alice no longer sees bob', !r.data.candidates.some((c) => c.id === bobId));
-check('GS12 alice interest state on bob wiped', r.data.candidates.find((c) => c.id === bobId) === undefined);
+check('GS11 alice still sees bob', r.data.candidates.some((c) => c.id === bobId));
 r = await bob.call('GET', '/api/candidates');
-check('GS13 bob now sees dana, not alice', r.data.candidates.some((c) => c.id === danaId) && !r.data.candidates.some((c) => c.id === aliceId));
-r = await bob.call('POST', '/api/interests', { candidateId: danaId, interested: true });
-check('GS14 bob (now woman) can select dana', r.status === 200);
+check('GS12 bob still sees alice, not dana', r.data.candidates.some((c) => c.id === aliceId) && !r.data.candidates.some((c) => c.id === danaId));
 r = await bob.call('PUT', '/api/me/profile', { displayName: 'בוב', bio: 'לומד גמרא', learningTopics: ['גמרא'], learningLevel: 'intermediate', preferredModes: ['video'], availableDays: ['sun', 'tue'], availabilityNotes: '', gender: 'man' });
-check('GS15 bob changes back to man', r.status === 200);
-r = await bob.call('GET', '/api/candidates');
-check('GS16 change-back severed bob-dana selection', !r.data.candidates.some((c) => c.id === danaId));
-r = await alice.call('GET', `/api/connections/${connId}/contact`);
-check('GS17 cancelled connection stays cancelled after change-back', r.status === 403);
+check('GS13 same-gender no-op update allowed', r.status === 200);
 
 // --- reports ---
 r = await eve.call('POST', '/api/reports', { reportedUserId: bobId, reason: 'התנהגות פוגענית', details: 'פרטים' });

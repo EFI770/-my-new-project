@@ -1,7 +1,8 @@
 -- DRAFT (pending backend-vendor confirmation; Postgres/Supabase flavor).
 -- 0004: mandatory same-gender learning separation.
--- Community rule (product owner, 2026-11-06): men learn with men, women with
--- women. Gender is self-declared at signup (man/woman); the platform does not
+-- Product rule (explicit instruction from the app owner Efi via his own
+-- WhatsApp channel, 2026-11-06): men learn with men, women with women.
+-- Gender is self-declared at signup (man/woman); the platform does not
 -- verify identity beyond that declaration. The separation is enforced in the
 -- database layer, not in the UI:
 --   * profiles, open study requests, interest selections, mutual matches,
@@ -9,9 +10,12 @@
 --     pairs;
 --   * a missing gender (NULL) fails CLOSED: the user sees no one and no one
 --     sees them, except their own profile/requests;
---   * changing gender severs every pending/accepted connection request and
---     deletes interest selections in both directions, so no cross-gender
---     connection or match can survive a change (AFTER UPDATE trigger).
+--   * gender is IMMUTABLE once set (PROVISIONAL, pending the owner's product
+--     decision on gender-change policy): the trigger below rejects any
+--     change to a non-NULL gender, so no cross-gender tie can ever be
+--     created by editing a profile. Setting gender for the first time
+--     (NULL -> value) stays allowed; a genderless user can form no ties,
+--     so a first-time set cannot create a cross-gender tie either.
 
 alter table public.profiles
   add column if not exists gender text check (gender in ('man', 'woman'));
@@ -171,12 +175,13 @@ $$;
 revoke all on function public.get_connection_contact(uuid) from public, anon;
 grant execute on function public.get_connection_contact(uuid) to authenticated;
 
--- Gender change severs: cancel every pending/accepted connection request the
--- user is part of (clearing both consent flags) and delete interest
--- selections in both directions. Runs as owner so RLS cannot weaken it; fires
--- on ANY gender update path. Study requests the user owns stay (they become
--- visible only to the new gender); blocks and reports are gender-agnostic and
--- stay too.
+-- Gender-change policy is FROZEN fail-closed (provisional): any attempt to
+-- change an already-set gender is rejected on EVERY update path (the trigger
+-- runs as owner, so RLS cannot weaken it). This preserves the same-gender
+-- invariant without applying any unreviewed destructive severing rule. The
+-- alternatives for the owner's later decision (keep immutable / allow change
+-- with full severance of ties / admin-mediated change) are documented in
+-- docs/FRONTEND_REBUILD.md.
 create or replace function public.on_profile_gender_change()
 returns trigger
 language plpgsql
@@ -184,16 +189,8 @@ security definer
 set search_path = ''
 as $$
 begin
-  if old.gender is distinct from new.gender then
-    update public.connection_requests
-       set status = 'cancelled',
-           requester_contact_consent = false,
-           recipient_contact_consent = false,
-           updated_at = now()
-     where (requester_id = new.id or recipient_id = new.id)
-       and status in ('pending', 'accepted');
-    delete from public.interest_selections
-     where viewer_id = new.id or candidate_id = new.id;
+  if old.gender is not null and new.gender is distinct from old.gender then
+    raise exception 'Gender change is not permitted in this version' using errcode = '22023';
   end if;
   return new;
 end;

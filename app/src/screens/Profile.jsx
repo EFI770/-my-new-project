@@ -18,7 +18,6 @@ export default function Profile() {
   const [blocks, setBlocks] = useState(null);
   const [report, setReport] = useState(null); // {reason, details, reportedUserId}
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [genderChange, setGenderChange] = useState(null); // target gender pending confirm
   useEffect(() => { api.blocks().then((r) => setBlocks(r.blocks)).catch(() => setBlocks([])); }, []);
 
   function toggle(list, v) { return list.includes(v) ? list.filter((x) => x !== v) : [...list, v]; }
@@ -68,20 +67,6 @@ export default function Profile() {
     await refreshMe();
   }
 
-  async function confirmGenderChange() {
-    try {
-      await api.updateProfile({
-        displayName: form.displayName || p.display_name, bio: form.bio,
-        learningTopics: form.learningTopics, learningLevel: form.learningLevel || null,
-        preferredModes: form.preferredModes, availableDays: form.availableDays,
-        availabilityNotes: form.availabilityNotes, gender: genderChange,
-      });
-      setGenderChange(null);
-      await refreshMe();
-      showToast(t('toastProfileSaved'));
-    } catch (err) { showToast(errText(t, err)); }
-  }
-
   return (
     <div className="mx-auto max-w-[560px] space-y-8">
       <section>
@@ -94,36 +79,10 @@ export default function Profile() {
           </label>
           <div>
             <span className="text-[13px] font-medium">{t('genderSection')}</span>
-            <div className="mt-1.5 flex items-center gap-2">
-              {['man', 'woman'].map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => { if (g !== p.gender) setGenderChange(g); }}
-                  aria-pressed={p.gender === g}
-                  className={`flex-1 rounded-xl border py-2.5 text-[14px] font-medium ${
-                    p.gender === g
-                      ? 'border-green-dark bg-green-dark text-white'
-                      : 'border-[#e7e5e4] bg-white text-ink'
-                  }`}
-                >
-                  {labels.gender(g)}
-                </button>
-              ))}
+            <div className="mt-1.5 rounded-xl border border-[#e7e5e4] bg-cream-2/50 px-4 py-2.5 text-[14px] text-ink">
+              {p.gender ? labels.gender(p.gender) : '—'}
             </div>
-            {genderChange && (
-              <div className="mt-3 rounded-[14px] border border-[#fde68a] bg-[#fffbeb] p-4">
-                <div className="text-[13px] leading-6 text-[#92400e]">{t('genderChangeWarning')}</div>
-                <div className="flex gap-2 pt-3">
-                  <button onClick={confirmGenderChange} className="flex-1 rounded-full bg-[#b45309] py-2.5 text-[14px] font-medium text-white">
-                    {t('genderChangeConfirm')}
-                  </button>
-                  <button onClick={() => setGenderChange(null)} className="flex-1 rounded-full border border-[#e7e5e4] bg-white py-2.5 text-[14px]">
-                    {t('cancel')}
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="pt-1.5 text-[11px] leading-5 text-ink-2">{t('genderFixedNote')}</div>
           </div>
           <label className="block">
             <span className="text-[13px] font-medium">{t('aboutMe')}</span>
