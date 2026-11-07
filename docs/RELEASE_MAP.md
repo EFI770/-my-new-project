@@ -52,19 +52,21 @@ an older proposal branch wholesale over the current accepted application.
 
 ## One production target, not two long-term apps
 
-A canonical address is still to be chosen. Two possible implementations:
+Owner clarified that there is no need for the old active site once the new one
+works. Selected transition: one canonical real app on its existing origin, old
+GitHub URL as a compatibility redirect. A shorter canonical hostname remains a
+separate optional choice; no additional frontend or data migration is needed.
 
-1. Keep the working same-origin real app on its current host and make old Pages
-   URL a compatibility handoff after public acceptance. Address bar changes.
-2. Host the new JS frontend at the existing GitHub Pages path and retain the
-   existing Worker API/database. Requires project-path asset base, explicit API
-   origin, narrowly allowed cross-origin API requests, Firebase authorized-domain
-   verification, and new-origin sign-in acceptance. Current build does not yet
-   contain these adaptations.
+Prepared artifact: deploy/legacy-entry/index.html. It redirects to the verified
+current host, includes an accessible manual fallback, does not relay query/hash
+values and never reads or clears local browser data. It is NOT the active Pages
+artifact. Main and the live old site remain untouched until readiness.
 
-No target is selected merely by writing this map. No public/main overwrite,
-redirect, duplicate real database or automatic demo-account migration is approved
-by this document. Preserve original localStorage and all real profiles either way.
+At approved activation, publish only the compatibility artifact, not the whole
+repository. Old code remains in Git history only, not a second active archive
+site. Keep the real profile/database and Google origin unchanged. No cross-origin
+API rewrite is required for this route. Do not infer that preparing this entry
+has changed the physical old iPhone icon yet.
 
 ## Acceptance boundary
 
