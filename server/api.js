@@ -155,11 +155,12 @@ async function sessionUser(req) {
     try { payload = await vendorAuth.verify(token); } catch { return null; }
     // Bind the verified vendor subject to the one app user it owns.
     const row = await db.asService(async (c) => {
-      const { rows } = await c.query('select id from auth.users where auth_sub = $1', [payload.sub]);
+      const { rows } = await c.query(
+        'select u.id, p.age_attested_at from auth.users u left join public.profiles p on p.id=u.id where u.auth_sub = $1', [payload.sub]);
       return rows[0] || null;
     });
     if (!row) return null;
-    return { id: row.id, email: typeof payload.email === 'string' ? payload.email : null, sub: payload.sub };
+    return { id: row.id, email: typeof payload.email === 'string' ? payload.email : null, sub: payload.sub, adultAttested: !!row.age_attested_at };
   }
   const token = cookies(req).dev_session
     || (req.headers.authorization || '').replace(/^Bearer /i, '') || null;
@@ -785,9 +786,11 @@ const handler = async (req, res) => {
       // can read/delete itself and can attest - nothing else. This also covers
       // future OAuth-provisioned identities that never passed /api/auth/register.
       if (!isAuthRoute && !AGE_GATE_OPEN.has(`${r.method} ${url}`)) {
-        const att = await db.asService((c) => c.query(
-          'select age_attested_at from public.profiles where id = $1', [user.id]));
-        if (!att.rows[0] || !att.rows[0].age_attested_at) {
+        // Vendor binding and age gate share one fresh request-local lookup.
+        // No session cache: deletion/attestation changes apply on next request.
+        const adultAttested = vendorAuth ? user.adultAttested : !!(await db.asService((c) => c.query(
+          'select age_attested_at from public.profiles where id = $1', [user.id]))).rows[0]?.age_attested_at;
+        if (!adultAttested) {
           return send(res, 403, { error: 'age_attestation_required' });
         }
       }
