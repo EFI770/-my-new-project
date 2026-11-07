@@ -10,7 +10,7 @@ function Shell({ titleHe, titleEn, children }) {
       <a href="#/" className="text-[13px] text-green-dark underline">→ חזרה לאפליקציה · Back to the app</a>
       <h1 className="pt-4 text-[24px] font-bold text-green-dark">{titleHe}</h1>
       <div className="text-[14px] text-ink-2">{titleEn}</div>
-      <p role="note" className="mt-4 rounded-xl bg-amber-100 p-4 text-sm text-amber-900">טיוטה לבדיקה בלבד, לא נוסח סופי לפרסום. פרטי המפעיל והמדיניות עדיין טעונים השלמה ואישור. · Draft for review only, not a final published policy. Operator details and policy decisions still need confirmation.</p>
+
       <div className="grid gap-6 pt-6">{children}</div>
     </div>
   );
@@ -46,19 +46,19 @@ export function Privacy() {
         he={<>
           <H>1. מי אנחנו ומהי האפליקציה</H>
           <P>חברותא היא אפליקציה קהילתית להתאמת בני/בנות זוג ללימוד (חברותא). האפליקציה פועלת כפיילוט קהילתי, ללא תשלום.</P>
-          <P>מפעיל האתר והאחראי על המידע: <Blank>[יושלם לפני ההשקה: שם המפעיל, יישוב וכתובת דוא"ל לפניות פרטיות]</Blank></P>
+          <P>מפעיל האתר והאחראי על המידע: אפרים רייניץ, <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
         </>}
         en={<>
           <H>1. Who we are</H>
           <P>Chavruta is a community app that matches study partners (chavruta). It runs as a free community pilot.</P>
-          <P>Site operator and data controller: <Blank>[TO FILL BEFORE LAUNCH: operator name, locality, privacy contact email]</Blank></P>
+          <P>Site operator and data controller: אפרים רייניץ, <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
         </>}
       />
       <Section
         he={<>
           <H>2. איזה מידע נאסף</H>
           <P><b>פרטי זיהוי:</b> כתובת הדוא"ל שלך. עם הרשמה דרך Google - גם שם ותמונת פרופיל בסיסיים מחשבון Google שלך, בהסכמתך במסך של Google.</P>
-          <P><b>פרופיל לימוד:</b> שם תצוגה, מגדר (לצורך הפרדת התאמות בלבד, לפי כללי המיזם), תחומי לימוד, רמה, ימים ואופן לימוד מועדף.</P>
+          <P><b>פרופיל לימוד:</b> שם תצוגה, מגדר (לצורך הפרדת התאמות בלבד, לפי כללי המיזם), תחומי לימוד, רמה, ימים, חלונות שעות ומשך לימוד אופציונליים, ואופן לימוד מועדף.</P>
           <P><b>פעילות באפליקציה:</b> בקשות לימוד, אישורים ודחיות, והסכמות לחשיפת פרטי קשר.</P>
           <P><b>פרטי קשר שתבחרי/תבחר לשתף</b> (למשל טלפון) - נחשפים לצד השני רק לאחר הסכמה הדדית של שני הצדדים.</P>
           <P><b>מה לא נאסף:</b> אין גישה ל-Gmail, ל-Drive או לאנשי הקשר שלך. אין פרסומות. נכון לגרסה הנוכחית לא מוטמעים כלי מדידה (analytics) באפליקציה.</P>
@@ -113,11 +113,11 @@ export function Privacy() {
       <Section
         he={<>
           <H>6. שמירת מידע ומחיקה</H>
-          <P>המידע נשמר כל עוד החשבון פעיל. ניתן למחוק את החשבון בכל עת מתוך האפליקציה (מסך הפרופיל). המחיקה מסירה מיידית את פרופיל הלימוד, נתוני ההתאמה ופרטי הקשר. מחיקת רשומת הזהות אצל ספק הכניסה (Google דרך Firebase) מתבצעת כחלק מתהליך המחיקה באפליקציה; אם היא לא הושלמה, תוצע אפשרות לנסות שוב או לפנות למפעיל להסרה. לאחר מחיקה נשמר מזהה טכני בלבד של רשומת הכניסה (ללא פרופיל וללא אימייל) כדי למנוע פתיחה מחדש אוטומטית של חשבון שנמחק; המפעיל מוחק מזהה זה לפי בקשה. ייתכן שעותקים יישארו לזמן מה בגיבויים וביומני מערכת אצל ספק הענן, עד להחלפתם ומחיקתם לפי מדיניות הספק; טווח הזמן המדויק לכך טרם אומת.</P>
+          <P>המידע נשמר כל עוד החשבון פעיל. ניתן למחוק את החשבון בכל עת מתוך האפליקציה (מסך הפרופיל). המחיקה מסירה מיידית את פרופיל הלימוד, נתוני ההתאמה ופרטי הקשר. מחיקת רשומת הזהות אצל ספק הכניסה (Google דרך Firebase) מתבצעת כחלק מתהליך המחיקה באפליקציה; אם היא לא הושלמה, תוצע אפשרות לנסות שוב או לפנות למפעיל להסרה. לאחר מחיקה נשמר מזהה טכני בלבד של רשומת הכניסה וחותמת זמן (ללא פרופיל וללא אימייל), לחסימת חיבור ישן למשך שעה. לאחר שעה אפשר להירשם מחדש בכניסה חדשה ל-Google. ניקוי אוטומטי מתוכנן כל רבע שעה, ולכן המזהה מוסר בדרך כלל בתוך שעה ורבע; תקלה בשירות או במסד הנתונים עלולה לעכב זאת. ייתכן שעותקים יישארו לזמן מה בגיבויים וביומני מערכת אצל ספק הענן, עד להחלפתם ומחיקתם לפי מדיניות הספק; טווח הזמן המדויק לכך טרם אומת.</P>
         </>}
         en={<>
           <H>6. Retention and deletion</H>
-          <P>Data is kept while your account is active. You can delete your account at any time from within the app (profile screen). Deletion immediately removes the learning profile, matching data, and contact details. Removing the identity record at the sign-in provider (Google via Firebase) runs as part of in-app deletion; if it does not complete, you can retry or ask the operator to remove it. After deletion we retain only a technical identifier of the sign-in record (no profile, no email) to prevent automatic re-creation of a deleted account; the operator removes this identifier on request. Copies may persist for a limited time in the cloud provider's backups and system logs until they roll over and are deleted per the provider's policy; the exact timeframe has not yet been verified.</P>
+          <P>Data is kept while your account is active. You can delete your account at any time from within the app (profile screen). Deletion immediately removes the learning profile, matching data, and contact details. Removing the identity record at the sign-in provider (Google via Firebase) runs as part of in-app deletion; if it does not complete, you can retry or ask the operator to remove it. After deletion we retain only the sign-in technical identifier and deletion timestamp (no profile, no email), blocking old sessions for one hour. After one hour you may rejoin with a fresh Google sign-in. Automatic cleanup runs every 15 minutes, normally removing the marker within 75 minutes; service or database outages may delay cleanup. Copies may persist for a limited time in the cloud provider's backups and system logs until they roll over and are deleted per the provider's policy; the exact timeframe has not yet been verified.</P>
         </>}
       />
       <Section
@@ -145,13 +145,13 @@ export function Privacy() {
           <H>9. זכויותיך, שינויים ויצירת קשר</H>
           <P>בכפוף לחוק הגנת הפרטיות, התשמ"א-1981, יש לך זכות לעיין במידע שנשמר עליך, לבקש תיקונו או מחיקתו. חלק מהפעולות זמינות ישירות באפליקציה (עריכת פרופיל, מחיקת חשבון).</P>
           <P>שינוי מהותי במדיניות יפורסם באפליקציה לפני כניסתו לתוקף.</P>
-          <P>לפניות בנושא פרטיות: <Blank>[יושלם לפני ההשקה: כתובת דוא"ל לפניות]</Blank></P>
+          <P>לפניות בנושא פרטיות: <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
         </>}
         en={<>
           <H>9. Your rights, changes, and contact</H>
           <P>Under Israel's Privacy Protection Law, 1981, you have the right to review data held about you and to request its correction or deletion. Some actions are available directly in the app (edit profile, delete account).</P>
           <P>Material changes to this policy will be posted in the app before taking effect.</P>
-          <P>Privacy inquiries: <Blank>[TO FILL BEFORE LAUNCH: contact email]</Blank></P>
+          <P>Privacy inquiries: <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
         </>}
       />
     </Shell>
@@ -200,19 +200,19 @@ export function Accessibility() {
         </>}
         en={<>
           <H>Known limitations</H>
-          <P>The checks above cover only the screens and conditions tested. An actual iOS keyboard has not yet been tested, and a full professional manual audit has not been performed. Please report problems through the contact channel to be completed before launch.</P>
+          <P>The checks above cover only the screens and conditions tested. An actual iOS keyboard has not yet been tested, and a full professional manual audit has not been performed. Please report problems using the contact below.</P>
         </>}
       />
       <Section
         he={<>
           <H>יצירת קשר בנושא נגישות</H>
-          <P>נתקלתם בבעיית נגישות? פנו אלינו ונטפל: <Blank>[יושלם לפני ההשקה: ערוץ פנייה בנושא נגישות]</Blank></P>
-          <P>הצורך במינוי רכז נגישות ותחולת החובות המשפטיות ייבדקו לפני ההשקה. לא נקבעה בטיוטה זו זכאות לפטור.</P>
+          <P>נתקלתם בבעיית נגישות? פנו אלינו ונטפל: <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
+          <P>פרטי הקשר לעיל הם של מפעיל האתר לפניות נגישות. אין בהצהרה זו אישור עמידה מלאה בתקן או קביעה בדבר פטור מחובות נגישות.</P>
         </>}
         en={<>
           <H>Accessibility contact</H>
-          <P>Encountered an accessibility problem? Contact us and we will handle it: <Blank>[TO FILL BEFORE LAUNCH: accessibility contact channel]</Blank></P>
-          <P>The need for an accessibility coordinator and the applicable legal duties will be checked before launch. This draft does not establish an exemption.</P>
+          <P>Encountered an accessibility problem? Contact us and we will handle it: <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
+          <P>The contact above is the site operator for accessibility inquiries. This statement is not certification of full compliance or a determination of an exemption.</P>
         </>}
       />
     </Shell>

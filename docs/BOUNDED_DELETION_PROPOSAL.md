@@ -1,3 +1,7 @@
+# Approved rollout
+
+Owner approved the explained bounded policy on2026-11-07 at21:53:51 Jerusalem time. Integrated with current release using migration0011_bounded_firebase_deletion.sql, bounded-v1 flag and 15-minute scheduled cleanup. Earlier proposal record follows; not a statement of current deployment.
+
 # Proposed bounded Firebase deletion policy, NOT deployed or approved
 
 Prepared2026-11-07. Branch dev/bounded-deletion-proposal is separate from live.

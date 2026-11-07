@@ -1,4 +1,4 @@
--- PROPOSAL ONLY. Do not apply before policy approval and rollout review.
+-- Owner-approved bounded Firebase deletion policy,2026-11-07.
 -- Separate table leaves legacy Neon/deletion policy untouched.
 create table auth.firebase_deletion_markers (
   auth_sub text primary key,

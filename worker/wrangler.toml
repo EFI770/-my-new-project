@@ -3,9 +3,10 @@ main = "index.js"
 compatibility_date = "2026-11-06"
 compatibility_flags = ["nodejs_compat"]
 
-# Gated real-Firebase acceptance build. Public opening awaits owner sign-in verification.
+# Owner-approved public Firebase community pilot.
 [vars]
-PREVIEW_MODE = "private-firebase"
+PREVIEW_MODE = "public-firebase"
+FIREBASE_DELETION_POLICY = "bounded-v1"
 # Synthetic demo entry for THIS gated preview only (scrypt exceeds the Workers
 # Free 10ms CPU limit, so real register/login cannot run on the free runtime).
 # The route exists only when this is 'true' AND auth mode is not 'neon'.
@@ -38,3 +39,7 @@ localConnectionString = "postgresql://postgres:localdev@127.0.0.1:5432/chavruta_
 # Per-invocation logs (incl. per-route CPU time) for preview verification.
 [observability]
 enabled = true
+
+# Owner-approved hourly marker expiry, 15-minute normal cleanup cadence.
+[triggers]
+crons = ["*/15 * * * *"]

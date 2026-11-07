@@ -1,8 +1,5 @@
-// Chavruta private preview Worker.
-// Serves the built frontend (static assets) and the SAME api.js the local
-// dev listener runs, behind a fail-closed preview gate. Synthetic data only;
-// no real-user OAuth until the vendor auth origin story is resolved (proxy
-// stays disabled here: AUTH_MODE is 'dev', so /vendor-auth is never routed).
+// Chavruta public Firebase pilot, with optional private preview gate.
+// Uses the same API and RLS authorization as the local acceptance harness.
 import { createApiHandler } from '../server/api.js';
 import { createDb } from '../server/db.js';
 import { purgeExpiredFirebaseMarkers } from '../server/firebaseDeletionPolicy.js';
@@ -175,7 +172,7 @@ export default {
       });
     }
 
-    if (!(await gateOk(request, env))) {
+    if (env.PREVIEW_MODE !== 'public-firebase' && !(await gateOk(request, env))) {
       if (url.pathname.startsWith('/api/')) {
         return new Response(JSON.stringify({ error: 'preview_gate_required' }), { status: 403, headers: { 'content-type': 'application/json' } });
       }

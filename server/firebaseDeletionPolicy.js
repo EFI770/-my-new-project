@@ -1,4 +1,4 @@
-// PROPOSAL, opt-in only. Not approved for deployment.
+// Owner-approved bounded Firebase deletion policy, 2026-11-07.
 // Refresh preserves auth_time. A recent iat is never a recent login.
 export const SIGNUP_AUTH_MAX_AGE_SECONDS = 300;
 export const DELETION_MARKER_SECONDS = 3600;

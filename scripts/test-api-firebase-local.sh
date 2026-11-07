@@ -44,7 +44,7 @@ for f in supabase/migrations/0001_initial_schema.sql supabase/migrations/0002_co
 done
 
 if [ "${FIREBASE_DELETION_POLICY:-}" = 'bounded-v1' ]; then
-  psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f supabase/migrations/0010_PROPOSED_bounded_firebase_deletion.sql
+  psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f supabase/migrations/0011_bounded_firebase_deletion.sql
 fi
 
 CHAVRUTA_AUTH_MODE=firebase \

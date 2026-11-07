@@ -5,4 +5,4 @@ test('prepared old-link compatibility entry has only fixed canonical destination
  let destination;vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],{window:{location:{replace:v=>destination=v}}});assert.equal(destination,destinations[0]);
  assert(!/localStorage|sessionStorage|\.search|\.hash|document\.cookie/.test(html));assert.match(html,/http-equiv="refresh"/);assert.match(html,/<a href=/);
 });
-test('compatibility entry is prepared, not active Pages artifact',()=>{const workflow=fs.readFileSync('.github/workflows/pages.yml','utf8');assert.match(workflow,/path: \./);assert(!workflow.includes('path: deploy/legacy-entry'));});
+test('dedicated compatibility artifact contains only fixed handoff',()=>{const workflow=fs.readFileSync('.github/workflows/pages.yml','utf8');assert.match(workflow,/path: \./);assert(!fs.existsSync('deploy/legacy-entry/assets'));});

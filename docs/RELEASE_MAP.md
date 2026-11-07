@@ -1,3 +1,7 @@
+# Public rollout2026-11-07
+
+Canonical public Google-only app: https://chavruta-preview.efie770.workers.dev/ . Worker d2e9c11b-8d6e-44c9-b2aa-5c77fec0ab92. Owner approved operator contact and bounded deletion policy. Migration0011 applied preserving5 profiles. Bounded cleanup cron every15min. Earlier preparation log follows; time-sensitive statuses below are historical. Pages source is a dedicated compatibility-entry branch containing only the handoff. The old root-upload workflow is disabled, not edited.
+
 # Release map
 
 Status verified2026-11-07. This document distinguishes source backup, deployment
