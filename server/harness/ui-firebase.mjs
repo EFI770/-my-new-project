@@ -21,7 +21,7 @@ try {
       window.fixture = {pending:true,failDelete:true,state:'deleted'};
       export async function initFirebase() {}
       export function currentFirebaseUser() {return window.fixture.pending ? user : null;}
-      export async function signInWithGoogle() {window.fixture.pending=true;return user;}
+      export async function signInWithGoogle() {if(window.fixture.signInError)throw {code:window.fixture.signInError};window.fixture.pending=true;return user;}
       export async function signOutFirebase() {window.fixture.pending=false;}
       export async function deleteFirebaseUser() {if(window.fixture.failDelete)throw new Error('synthetic popup cancelled');window.fixture.pending=false;}
     `});
@@ -59,7 +59,15 @@ try {
   await clickText('Remove sign-in record');
   await page.waitForFunction(()=>!document.body.textContent.includes('Your app account was deleted.'));
   assert(!await page.$('[role="alert"]'),'successful retry clears error');
-  await page.evaluate(()=>window.fixture.state='new');
+  await page.evaluate(()=>window.fixture.signInError='auth/popup-blocked');
+  await clickText('Continue with Google');
+  await page.waitForFunction(()=>document.querySelector('[role=alert]')?.textContent.includes('auth/popup-blocked'));
+  assert((await page.$eval('[role=alert]',e=>e.textContent)).includes('Allow popups'),'popup blocked preserves actionable code and guidance');
+  await page.evaluate(()=>window.fixture.signInError='internal_error');
+  await clickText('Continue with Google');
+  await page.waitForFunction(()=>document.querySelector('[role=alert]')?.textContent.includes('internal_error'));
+  assert(true,'backend failure code is visible instead of generic masking');
+  await page.evaluate(()=>{window.fixture.signInError=null;window.fixture.state='new';});
   await clickText('Continue with Google');
   await page.waitForFunction(()=>document.body.textContent.includes('You signed in with Google.'));
   assert(!await page.$eval('button',()=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Continue with Google').disabled),'popup success resets busy flag despite early return');

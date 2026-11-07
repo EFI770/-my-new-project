@@ -19,6 +19,7 @@ export default function AuthScreen() {
   // server reports the vendor provider configured. Disabled by default.
   const [providers, setProviders] = useState(null);
   const [oauthBusy, setOauthBusy] = useState(false);
+  const [firebaseReady, setFirebaseReady] = useState(false);
   // Set after a successful Firebase Google sign-in when the server says the
   // identity is not registered yet: the form switches to the vendor-register
   // variant (name/gender/18+ only, no email/password) and registers with the
@@ -34,14 +35,29 @@ export default function AuthScreen() {
     if (!providers?.firebase?.enabled || !providers.firebase.config) return;
     initFirebase(providers.firebase.config)
       .then(async () => {
+        setFirebaseReady(true);
         const u = currentFirebaseUser();
         if (!u) return;
         const status = await api.authStatus();
         setVendorState(status.state);
         if (status.state !== 'registered') setPendingVendor(u);
       })
-      .catch(() => {});
+      .catch((err) => setError(googleError(err)));
   }, [providers]);
+
+  function googleError(err) {
+    const code = typeof err?.code === 'string' && /^auth\/[a-z0-9-]+$/.test(err.code) ? err.code : null;
+    const labels = {
+      'auth/popup-blocked': 'oauthPopupBlocked',
+      'auth/popup-closed-by-user': 'oauthPopupClosed',
+      'auth/unauthorized-domain': 'oauthDomainError',
+      'auth/operation-not-allowed': 'oauthProviderError',
+      'auth/network-request-failed': 'oauthNetworkError',
+      'auth/web-storage-unsupported': 'oauthStorageError',
+    };
+    const backendCode = typeof err?.code === 'string' && /^[a-z_]{1,50}$/.test(err.code) ? err.code : null;
+    return `${t(labels[code] || 'oauthStartFailed')}${code || backendCode ? ` (${code || backendCode})` : ''}`;
+  }
 
   async function removeVendorRecord() {
     setOauthBusy(true);
@@ -63,7 +79,9 @@ export default function AuthScreen() {
       if (providers?.firebase?.enabled && providers.firebase.config) {
         // Firebase route: popup sign-in, then check whether this identity is
         // already registered with the community.
-        await initFirebase(providers.firebase.config);
+        // SDK initialization finishes before the button is enabled. Keep popup
+        // creation in the trusted click turn, without an awaited initialization.
+        if (!firebaseReady) return;
         const user = await signInWithGoogle();
         const status = await api.authStatus();
         setVendorState(status.state);
@@ -94,8 +112,8 @@ export default function AuthScreen() {
       const data = await r.json().catch(() => null);
       if (r.ok && data?.url) { window.location.assign(data.url); return; }
       setError(t('oauthStartFailed'));
-    } catch {
-      setError(t('oauthStartFailed'));
+    } catch (err) {
+      setError(googleError(err));
     } finally {
       setOauthBusy(false);
     }
@@ -306,7 +324,7 @@ export default function AuthScreen() {
                 key={id}
                 type="button"
                 onClick={() => demoSignIn(id)}
-                disabled={oauthBusy}
+                disabled={oauthBusy || (providers?.firebase?.enabled && !firebaseReady)}
                 className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[14px] font-semibold text-ink disabled:opacity-60"
               >
                 {t(labelKey)}
@@ -322,7 +340,7 @@ export default function AuthScreen() {
           {vendorState === 'new' && <button
             type="button"
             onClick={() => { setGoogleUser(pendingVendor); setDisplayName(pendingVendor.displayName || ''); setMode('register'); }}
-            disabled={oauthBusy}
+            disabled={oauthBusy || (providers?.firebase?.enabled && !firebaseReady)}
             className="block w-full rounded-full bg-green-dark py-3 text-center text-[15px] font-semibold text-white disabled:opacity-60"
           >
             {t('finishSignup')}
@@ -330,7 +348,7 @@ export default function AuthScreen() {
           <button
             type="button"
             onClick={removeVendorRecord}
-            disabled={oauthBusy}
+            disabled={oauthBusy || (providers?.firebase?.enabled && !firebaseReady)}
             className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[14px] font-semibold text-ink disabled:opacity-60"
           >
             {t('removeSigninRecord')}
@@ -342,7 +360,7 @@ export default function AuthScreen() {
           <button
             type="button"
             onClick={googleSignIn}
-            disabled={oauthBusy}
+            disabled={oauthBusy || (providers?.firebase?.enabled && !firebaseReady)}
             className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[15px] font-semibold text-ink disabled:opacity-60"
           >
             {t('continueWithGoogle')}
