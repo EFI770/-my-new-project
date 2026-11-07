@@ -5,6 +5,7 @@
 // stays disabled here: AUTH_MODE is 'dev', so /vendor-auth is never routed).
 import { createApiHandler } from '../server/api.js';
 import { createDb } from '../server/db.js';
+import { purgeExpiredFirebaseMarkers } from '../server/firebaseDeletionPolicy.js';
 
 // ---------- preview gate (fail closed) ----------
 // Every route - API and static - requires the gate key. The key arrives as
@@ -134,6 +135,7 @@ function getApi(env) {
       env: {
         GOOGLE_SIGNIN_ENABLED: 'false',
         FIREBASE_SIGNIN_ENABLED: env.FIREBASE_SIGNIN_ENABLED === 'true' ? 'true' : 'false',
+        FIREBASE_DELETION_POLICY: env.FIREBASE_DELETION_POLICY || '',
         NEON_AUTH_URL: env.NEON_AUTH_URL || '',
         // Synthetic preview demo entry. 'true' ONLY for this gated preview
         // deployment; absent/false everywhere else = the route does not exist.
@@ -145,6 +147,15 @@ function getApi(env) {
 }
 
 export default {
+  async scheduled(event, env, ctx) {
+    if (env.AUTH_MODE !== 'firebase' || env.FIREBASE_DELETION_POLICY !== 'bounded-v1') return;
+    // Enable a 15-minute cron only after policy approval. Failure must be alerted,
+    // not hidden as a claim that a strict retention maximum was achieved.
+    await purgeExpiredFirebaseMarkers(createDb({
+      appUrl:env.HYPERDRIVE_APP.connectionString,
+      adminUrl:env.HYPERDRIVE_ADMIN.connectionString, perRequest:true,
+    }));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
 

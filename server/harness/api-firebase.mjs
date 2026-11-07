@@ -15,6 +15,8 @@ const JWKS_PORT = Number(process.env.JWKS_PORT || 4595);
 const PROJECT = 'chavruta-hermetic-test';
 const ISSUER = `https://securetoken.google.com/${PROJECT}`;
 const RUN = Date.now().toString(36);
+const bounded=process.env.FIREBASE_DELETION_POLICY==='bounded-v1';
+const markerTable=bounded?'auth.firebase_deletion_markers':'auth.deleted_subs';
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { if (cond) { pass++; console.log(`ok - ${name}`); } else { fail++; console.log(`FAIL - ${name} ${extra}`); } };
 
@@ -30,8 +32,8 @@ const jwksServer = http.createServer((req, res) => {
 });
 await new Promise((r) => jwksServer.listen(JWKS_PORT, '127.0.0.1', r));
 
-async function mintToken({ sub, email, name, issuer = ISSUER, audience = PROJECT, expiresIn = '1h', key = privateKey, kid = 'hermetic-key-1' }) {
-  return new SignJWT({ sub, email: email || `${sub}@example.com`, name: name || sub, email_verified: true, auth_time: Math.floor(Date.now() / 1000) })
+async function mintToken({ sub, email, name, issuer = ISSUER, audience = PROJECT, expiresIn = '1h', key = privateKey, kid = 'hermetic-key-1', authTime = Math.floor(Date.now()/1000) }) {
+  return new SignJWT({ sub, email: email || `${sub}@example.com`, name: name || sub, email_verified: true, auth_time: authTime })
     .setProtectedHeader({ alg: 'RS256', kid })
     .setIssuedAt()
     .setIssuer(issuer)
@@ -184,7 +186,7 @@ await sql.query(`create trigger fail_test_delete before delete on auth.users for
 try {
   const failed = await api('DELETE', '/api/me', { jwt: D.jwt });
   const stillMember = await api('GET', '/api/me', { jwt: D.jwt });
-  const tomb = await sql.query('select 1 from auth.deleted_subs where auth_sub=$1', [D.sub]);
+  const tomb = await sql.query(`select 1 from ${markerTable} where auth_sub=$1`, [D.sub]);
   ok('F18 failed delete 500 with member preserved', failed.status === 500 && stillMember.status === 200);
   ok('F18b failed delete rolls tombstone back', tomb.rowCount === 0);
 } finally {
@@ -233,6 +235,18 @@ tr=await api('PUT',`/api/study-requests/${reqId}`,{jwt:T.jwt,body:{availableDays
 tr=await api('GET','/api/study-requests',{jwt:T.jwt});const ts=tr.data?.studyRequests?.find(x=>x.id===reqId);ok('T7 request times persist after reload',ts?.availableWindows?.[0]?.start==='10:00'&&ts?.studyDurationMinutes===60&&ts?.availableDays?.[0]==='mon');
 tr=await api('PUT','/api/me/profile',{jwt:T.jwt,body:{displayName:'time preferences test',bio:'',availableWindows:[{start:'08:00',end:'08:00'}]}});ok('T8 invalid availability rejected before mutation',tr.status===400&&tr.data?.error==='invalid_availability');
 const unchanged=await sql.query('select study_duration_minutes from public.profiles p join auth.users u on p.id=u.id where auth_sub=$1',[T.sub]);ok('T9 invalid update preserves existing data',unchanged.rows[0]?.study_duration_minutes===60);
+if(bounded){
+ const deletedSub=D.sub;
+ await sql.query("update auth.firebase_deletion_markers set deleted_at=now()-interval '61 minutes' where auth_sub=$1",[deletedSub]);
+ const staleRefresh=await mintToken({sub:deletedSub,authTime:Math.floor(Date.now()/1000)-7200});
+ const stale=await api('POST','/api/auth/register',{localAddress:'127.0.0.31',jwt:staleRefresh,body:{displayName:'stale refresh',gender:'man',attestAdult:true}});
+ ok('B1 expired marker plus fresh iat but old auth_time cannot recreate',stale.status===401&&stale.data.error==='recent_login_required');
+ const stillAbsent=await sql.query('select 1 from auth.users where auth_sub=$1',[deletedSub]);ok('B2 denied refresh leaves no binding',stillAbsent.rowCount===0);
+ const fresh=await mintToken({sub:deletedSub});
+ const rejoin=await api('POST','/api/auth/register',{localAddress:'127.0.0.32',jwt:fresh,body:{displayName:'explicit rejoin',gender:'man',attestAdult:true}});
+ ok('B3 explicit fresh sign-in can rejoin after one hour even if vendor erasure failed',rejoin.status===201);
+ const cleared=await sql.query('select 1 from auth.firebase_deletion_markers where auth_sub=$1',[deletedSub]);ok('B4 rejoin clears expired marker atomically',cleared.rowCount===0);
+}
 await sql.end();
 
 await new Promise((r) => jwksServer.close(r));

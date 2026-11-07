@@ -94,12 +94,12 @@ export default function AuthScreen() {
           navigate('find');
         } else if (status.state === 'new') {
           setGoogleUser(user);
-          setDisplayName(user.displayName || '');
+          setDisplayName(previous => googleUser ? previous : (user.displayName || ''));
           setMode('register');
         } else {
           setPendingVendor(user);
           setGoogleUser(null);
-          setError(t('err_account_deleted'));
+          setError(t(providers?.deletionPolicy?.kind === 'bounded-v1' ? 'err_account_deleted_bounded' : 'err_account_deleted'));
         }
         return;
       }
@@ -341,7 +341,7 @@ export default function AuthScreen() {
         {error && <div role="alert" className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] text-[#991b1b]">{error}</div>}
       {pendingVendor && !googleUser && (
         <div className="auth-actions pt-4 space-y-2">
-          <p className="rounded-xl bg-cream-2 px-4 py-3 text-[12px] leading-5 text-ink-2">{t(vendorState === 'deleted' ? 'deletedVendorSessionNote' : 'vendorSessionNote')}</p>
+          <p className="rounded-xl bg-cream-2 px-4 py-3 text-[12px] leading-5 text-ink-2">{t(vendorState === 'deleted' ? (providers?.deletionPolicy?.kind === 'bounded-v1' ? 'deletedVendorSessionNoteBounded' : 'deletedVendorSessionNote') : 'vendorSessionNote')}</p>
           {vendorState === 'new' && <button
             type="button"
             onClick={() => { setGoogleUser(pendingVendor); setDisplayName(pendingVendor.displayName || ''); setMode('register'); }}

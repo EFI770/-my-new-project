@@ -5,6 +5,7 @@
 // shape only; it contains no authorization decisions of its own.
 import { mapPgError } from './db.js';
 import { cleanStudyAvailability } from '../app/src/availability.js';
+import { requireRecentSignupAuth } from './firebaseDeletionPolicy.js';
 import { hashPassword, verifyPassword, newSessionToken, sessionExpiry } from './devAuth.js';
 import { createNeonAuth } from './neonAuth.js';
 import { createFirebaseAuth } from './firebaseAuth.js';
@@ -94,6 +95,10 @@ async function proxyVendorAuth(req, res, url) {
 
 
 const ENV = config.env || {};
+const boundedFirebaseDeletion = AUTH_MODE === 'firebase' && ENV.FIREBASE_DELETION_POLICY === 'bounded-v1';
+// Controlled identifiers only, never derived from user/external data.
+const deletionTable = boundedFirebaseDeletion ? 'auth.firebase_deletion_markers' : 'auth.deleted_subs';
+const deletionPredicate = boundedFirebaseDeletion ? "and deleted_at > now()-interval '1 hour'" : '';
 
 // Neon management API wiring (community mode only): used exclusively to erase
 // the vendor-side identity record on account deletion, so deletion is complete
@@ -217,7 +222,7 @@ route('GET', '/api/auth/status', async (req, res) => {
   catch { return send(res, 401, { error: 'authentication_required' }); }
   const state = await db.asService(async (c) => {
     const result = await c.query(`select
-      exists(select 1 from auth.deleted_subs where auth_sub=$1) as deleted,
+      exists(select 1 from ${deletionTable} where auth_sub=$1 ${deletionPredicate}) as deleted,
       exists(select 1 from auth.users where auth_sub=$1) as registered`, [payload.sub]);
     return result.rows[0].deleted ? 'deleted' : result.rows[0].registered ? 'registered' : 'new';
   });
@@ -252,10 +257,14 @@ route('POST', '/api/auth/register', async (req, res) => {
     const created = await vendorTransaction(payload.sub, async (c) => {
       // Deletion tombstone: a deleted vendor subject cannot re-register while
       // its (still-valid) vendor token survives. Operator clears the row.
-      const tomb = await c.query('select 1 from auth.deleted_subs where auth_sub = $1', [payload.sub]);
+      const tomb = await c.query(`select 1 from ${deletionTable} where auth_sub = $1 ${deletionPredicate}`, [payload.sub]);
       if (tomb.rows.length) return 'tombstoned';
       const existing = await c.query('select id from auth.users where auth_sub = $1', [payload.sub]);
       if (existing.rows.length) return null;
+      if (boundedFirebaseDeletion) {
+        requireRecentSignupAuth(payload);
+        await c.query(`delete from ${deletionTable} where auth_sub=$1`,[payload.sub]);
+      }
       const { rows } = await c.query(
         'insert into auth.users (id, auth_sub) values (gen_random_uuid(), $1) returning id', [payload.sub]);
       const id = rows[0].id;
@@ -293,6 +302,10 @@ route('POST', '/api/auth/register', async (req, res) => {
   const created = await db.asService(async (c) => {
     const existing = await c.query('select 1 from dev_auth.users where email = $1', [email]);
     if (existing.rows.length) return null;
+      if (boundedFirebaseDeletion) {
+        requireRecentSignupAuth(payload);
+        await c.query(`delete from ${deletionTable} where auth_sub=$1`,[payload.sub]);
+      }
     const { rows } = await c.query(
       'insert into dev_auth.users (email, password_hash) values ($1, $2) returning id',
       [email, hashPassword(password)]);
@@ -403,6 +416,7 @@ if (DEMO_ENABLED) {
 // base URL is configured. No tokens or secrets here - the base URL is public.
 route('GET', '/api/auth/providers', async (req, res) => {
   send(res, 200, {
+    deletionPolicy: boundedFirebaseDeletion ? {kind:'bounded-v1', markerSeconds:3600, signupAuthSeconds:300} : {kind:'legacy'},
     // Community mode defaults to Google-only registration (owner's expressed
     // preference 2026-11-06 11:59 IST); EMAIL_AUTH_ENABLED=true opts back in.
     // Dev emulator keeps email/password for local testing.
@@ -518,7 +532,7 @@ route('DELETE', '/api/me', async (req, res, user) => {
       authSub = rows[0] && rows[0].auth_sub || null;
       // Tombstone the vendor subject so its still-valid token cannot
       // immediately re-register the account the user just deleted (0007).
-      if (authSub) await c.query('insert into auth.deleted_subs (auth_sub) values ($1) on conflict do nothing', [authSub]);
+      if (authSub) await c.query(`insert into ${deletionTable} (auth_sub) values ($1) on conflict (auth_sub) do update set deleted_at=now()`, [authSub]);
     }
     await c.query('delete from auth.users where id = $1', [user.id]);
     if (!vendorAuth) await c.query('delete from dev_auth.users where id = $1', [user.id]);
