@@ -99,15 +99,15 @@ export function Privacy() {
       <Section
         he={<>
           <H>5. היכן המידע נשמר ומי מעבד אותו</H>
-          <P>מסד נתוני האפליקציה מופעל על ידי Neon באזור מזרח ארה"ב. האתר מוגש דרך Cloudflare. בתצוגת הדמו נעשה שימוש במשתמשים סינתטיים בלבד. לפיילוט עם משתמשים אמיתיים נבחר Firebase Authentication לצורך כניסה דרך Google; החיבור בפועל טרם אומת. המידע עשוי להיות מעובד מחוץ לישראל; מיקומי העיבוד ותקופות השמירה אצל הספקים טעונים אימות לפני ההשקה.</P>
+          <P>מסד נתוני האפליקציה מופעל על ידי Neon באזור מזרח ארה"ב. האתר מוגש דרך Cloudflare. Firebase Authentication משמש לכניסה דרך Google. משתמשי בדיקה סינתטיים מופרדים ממשתמשי הקהילה ואינם מוצגים להם. המידע עשוי להיות מעובד מחוץ לישראל; מיקומי העיבוד הנוספים ותקופות השמירה בגיבויים וביומני הספקים טרם אומתו.</P>
           <P>בעת הרשמה דרך Google, Google מעבדת את ההזדהות בהתאם למדיניות הפרטיות שלה.</P>
-          <P>ההרשמה המתוכננת היא דרך Google בלבד, ללא סיסמה נפרדת לאפליקציה. שליחת דוא"ל מתוך האפליקציה כבויה בתצוגה המקדימה. אין שליחת דוא"ל שיווקי.</P>
+          <P>ההרשמה היא דרך Google בלבד, ללא סיסמה נפרדת לאפליקציה. שליחת דוא"ל מתוך האפליקציה כבויה. אין שליחת דוא"ל שיווקי.</P>
         </>}
         en={<>
           <H>5. Where data is stored and who processes it</H>
-          <P>The app database is hosted by Neon in the US East region. Cloudflare serves the website. The demo uses synthetic users only. Firebase Authentication has been selected for Google sign-in in the real-user pilot; the live connection has not yet been verified. Data may be processed outside Israel; provider processing locations and retention periods need verification before launch.</P>
+          <P>The app database is hosted by Neon in the US East region. Cloudflare serves the website. Firebase Authentication provides Google sign-in. Synthetic test users are isolated from community members and are not shown to them. Data may be processed outside Israel; additional provider processing locations and backup/log retention periods have not yet been verified.</P>
           <P>When you sign up with Google, Google processes the authentication under its own privacy policy.</P>
-          <P>The planned sign-in method is Google only, with no separate app password. Email sending from the app is disabled in the preview. No marketing email is sent.</P>
+          <P>Sign-in is Google only, with no separate app password. Email sending from the app is disabled. No marketing email is sent.</P>
         </>}
       />
       <Section
@@ -178,7 +178,7 @@ export function Accessibility() {
         </>}
         en={<>
           <H>Adjustments implemented</H>
-          <P>The app includes a "skip to content" link, RTL and LTR support, semantic headings and landmarks, current-page marking in the menu, screen-reader status messages, and forms with Hebrew and English labels. These adjustments do not establish full compliance; more testing is needed before launch.</P>
+          <P>The app includes a "skip to content" link, RTL and LTR support, semantic headings and landmarks, current-page marking in the menu, screen-reader status messages, and forms with Hebrew and English labels. These adjustments do not establish full compliance; further testing is still needed.</P>
         </>}
       />
       <Section
@@ -196,7 +196,7 @@ export function Accessibility() {
       <Section
         he={<>
           <H>מגבלות ידועות</H>
-          <P>הבדיקות המתוארות לעיל מוגבלות למסכים ולתנאים שנבדקו. טרם נבדקה מקלדת iOS אמיתית, וטרם בוצעה בדיקה ידנית מקצועית מלאה. אם נתקלתם בבעיה, פנו בערוץ הקשר שיושלם לפני ההשקה.</P>
+          <P>הבדיקות המתוארות לעיל מוגבלות למסכים ולתנאים שנבדקו. טרם נבדקה מקלדת iOS אמיתית, וטרם בוצעה בדיקה ידנית מקצועית מלאה. אם נתקלתם בבעיה, פנו באמצעות פרטי הקשר שלהלן.</P>
         </>}
         en={<>
           <H>Known limitations</H>
