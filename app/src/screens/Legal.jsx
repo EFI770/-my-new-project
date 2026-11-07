@@ -1,8 +1,8 @@
 // Public legal pages (privacy policy + accessibility statement).
 // Hebrew is the controlling version; the English section is a mirror.
-// Blanks marked [ישולם לפני ההשקה] / [TO FILL BEFORE LAUNCH] are owner
+// Blanks marked [יושלם לפני ההשקה] / [TO FILL BEFORE LAUNCH] are owner
 // decisions; the pages must not ship to the public with blanks in them.
-// Facts here mirror the code as verified on 2026-11-06 (see repo docs).
+// Draft facts distinguish the deployed synthetic preview from the planned Firebase pilot.
 
 function Shell({ titleHe, titleEn, children }) {
   return (
@@ -10,6 +10,7 @@ function Shell({ titleHe, titleEn, children }) {
       <a href="#/" className="text-[13px] text-green-dark underline">→ חזרה לאפליקציה · Back to the app</a>
       <h1 className="pt-4 text-[24px] font-bold text-green-dark">{titleHe}</h1>
       <div className="text-[14px] text-ink-2">{titleEn}</div>
+      <p role="note" className="mt-4 rounded-xl bg-amber-100 p-4 text-sm text-amber-900">טיוטה לבדיקה בלבד, לא נוסח סופי לפרסום. פרטי המפעיל והמדיניות עדיין טעונים השלמה ואישור. · Draft for review only, not a final published policy. Operator details and policy decisions still need confirmation.</p>
       <div className="grid gap-6 pt-6">{children}</div>
     </div>
   );
@@ -45,7 +46,7 @@ export function Privacy() {
         he={<>
           <H>1. מי אנחנו ומהי האפליקציה</H>
           <P>חברותא היא אפליקציה קהילתית להתאמת בני/בנות זוג ללימוד (חברותא). האפליקציה פועלת כפיילוט קהילתי, ללא תשלום.</P>
-          <P>מפעיל האתר והאחראי על המידע: <Blank>[ישולם לפני ההשקה: שם המפעיל, יישוב וכתובת דוא"ל לפניות פרטיות]</Blank></P>
+          <P>מפעיל האתר והאחראי על המידע: <Blank>[יושלם לפני ההשקה: שם המפעיל, יישוב וכתובת דוא"ל לפניות פרטיות]</Blank></P>
         </>}
         en={<>
           <H>1. Who we are</H>
@@ -98,15 +99,15 @@ export function Privacy() {
       <Section
         he={<>
           <H>5. היכן המידע נשמר ומי מעבד אותו</H>
-          <P>מסד הנתונים ושירות הזהויות מופעלים על ידי Neon (ספק ענן) בשרתים במזרח ארה"ב. המידע מועבר ונשמר מחוץ לישראל.</P>
+          <P>מסד נתוני האפליקציה מופעל על ידי Neon באזור מזרח ארה"ב. האתר מוגש דרך Cloudflare. בתצוגת הדמו נעשה שימוש במשתמשים סינתטיים בלבד. לפיילוט עם משתמשים אמיתיים נבחר Firebase Authentication לצורך כניסה דרך Google; החיבור בפועל טרם אומת. המידע עשוי להיות מעובד מחוץ לישראל; מיקומי העיבוד ותקופות השמירה אצל הספקים טעונים אימות לפני ההשקה.</P>
           <P>בעת הרשמה דרך Google, Google מעבדת את ההזדהות בהתאם למדיניות הפרטיות שלה.</P>
-          <P>שירות הזהויות עשוי לשלוח הודעות דוא"ל תפעוליות (למשל אימות כניסה) מכתובת השירות של הספק. אין שליחת דוא"ל שיווקי.</P>
+          <P>ההרשמה המתוכננת היא דרך Google בלבד, ללא סיסמה נפרדת לאפליקציה. שליחת דוא"ל מתוך האפליקציה כבויה בתצוגה המקדימה. אין שליחת דוא"ל שיווקי.</P>
         </>}
         en={<>
           <H>5. Where data is stored and who processes it</H>
-          <P>The database and identity service are operated by Neon (a cloud provider) on servers in the US East region. Data is transferred to and stored outside Israel.</P>
+          <P>The app database is hosted by Neon in the US East region. Cloudflare serves the website. The demo uses synthetic users only. Firebase Authentication has been selected for Google sign-in in the real-user pilot; the live connection has not yet been verified. Data may be processed outside Israel; provider processing locations and retention periods need verification before launch.</P>
           <P>When you sign up with Google, Google processes the authentication under its own privacy policy.</P>
-          <P>The identity service may send operational email (e.g. sign-in verification) from the provider's service address. No marketing email is sent.</P>
+          <P>The planned sign-in method is Google only, with no separate app password. Email sending from the app is disabled in the preview. No marketing email is sent.</P>
         </>}
       />
       <Section
@@ -144,7 +145,7 @@ export function Privacy() {
           <H>9. זכויותיך, שינויים ויצירת קשר</H>
           <P>בכפוף לחוק הגנת הפרטיות, התשמ"א-1981, יש לך זכות לעיין במידע שנשמר עליך, לבקש תיקונו או מחיקתו. חלק מהפעולות זמינות ישירות באפליקציה (עריכת פרופיל, מחיקת חשבון).</P>
           <P>שינוי מהותי במדיניות יפורסם באפליקציה לפני כניסתו לתוקף.</P>
-          <P>לפניות בנושא פרטיות: <Blank>[ישולם לפני ההשקה: כתובת דוא"ל לפניות]</Blank></P>
+          <P>לפניות בנושא פרטיות: <Blank>[יושלם לפני ההשקה: כתובת דוא"ל לפניות]</Blank></P>
         </>}
         en={<>
           <H>9. Your rights, changes, and contact</H>
@@ -163,55 +164,55 @@ export function Accessibility() {
       <Section
         he={<>
           <H>המחויבות שלנו</H>
-          <P>אנו פועלים להנגשת האפליקציה בהתאם לתקן הישראלי ת"י 5568 (המבוסס על WCAG 2.0 ברמה AA), ומיישמים בפועל גם קריטריונים מ-WCAG 2.2 ברמה AA. הנגישות היא חלק מתכנון המערכת, לא תוספת חיצונית.</P>
+          <P>אנו פועלים להנגשת האפליקציה בהתאם לתקן הישראלי ת"י 5568 (המבוסס על WCAG 2.0 ברמה AA), ובוחנים גם קריטריונים מ-WCAG 2.2 ברמה AA. הנגישות היא חלק מתכנון המערכת, לא תוספת חיצונית.</P>
         </>}
         en={<>
           <H>Our commitment</H>
-          <P>We work to make the app accessible per Israeli Standard 5568 (based on WCAG 2.0 level AA), and in practice also apply criteria from WCAG 2.2 level AA. Accessibility is built into the product, not bolted on.</P>
+          <P>We work to make the app accessible per Israeli Standard 5568 (based on WCAG 2.0 level AA), and also consider WCAG 2.2 level AA criteria. Accessibility is built into the product, not bolted on.</P>
         </>}
       />
       <Section
         he={<>
-          <H>התאמות שיושמה</H>
-          <P>ניווט מלא במקלדת בלבד (כולל קיצור "דלג לתוכן"), תמיכה מלאה ב-RTL וב-LTR, סמנטיקה לקוראי מסך (כותרות, אזורי תוכן, סימון העמוד הפעיל בתפריט), יעדי מגע בגודל 48px לפחות, הודעות מערכת המוכרזות לקורא מסך, וטפסים עם תוויות ברורות בעברית ובאנגלית.</P>
+          <H>התאמות שיושמו</H>
+          <P>האפליקציה כוללת קישור "דלג לתוכן", תמיכה ב-RTL וב-LTR, כותרות ואזורי תוכן סמנטיים, סימון העמוד הפעיל בתפריט, הודעות מערכת לקוראי מסך וטפסים עם תוויות בעברית ובאנגלית. התאמות אלה אינן אישור לעמידה מלאה בתקן; נדרשות בדיקות נוספות לפני ההשקה.</P>
         </>}
         en={<>
           <H>Adjustments implemented</H>
-          <P>Full keyboard-only navigation (including a "skip to content" shortcut), full RTL and LTR support, screen-reader semantics (headings, landmarks, current-page marking in the menu), touch targets of at least 48px, system messages announced to screen readers, and forms with clear labels in Hebrew and English.</P>
+          <P>The app includes a "skip to content" link, RTL and LTR support, semantic headings and landmarks, current-page marking in the menu, screen-reader status messages, and forms with Hebrew and English labels. These adjustments do not establish full compliance; more testing is needed before launch.</P>
         </>}
       />
       <Section
         he={<>
           <H>בדיקות שבוצעו</H>
-          <P>ב-6 בנובמבר 2026 בוצעו על הגרסה העדכנית: סריקת axe-core אוטומטית (קריטריוני WCAG 2.0/2.1/2.2 רמות A ו-AA) על כל מסכי האפליקציה, כולל עמוד זה - 0 הפרות נמצאו; ובדיקת ניווט מקלדת מלאה ותצוגה ברוחב 320 פיקסל (המסך הנייד הצר הנפוץ) - כל 6 הבדיקות עברו.</P>
+          <P>ב-7 בנובמבר 2026 נבדקו מסכי המועמדים המעודכנים בעברית ברוחב 320 ו-390 פיקסל ובמחשב, ובאנגלית ברוחב 390 פיקסל ובמחשב. בסריקת axe-core לקריטריוני WCAG 2.0/2.1 ברמות A ו-AA לא נמצאו הפרות במסכים אלה. נבדקו גם גלילה ומיקוד כך שכפתור הבחירה אינו מוסתר בתפריט התחתון. זו אינה בדיקה מלאה של כל מסכי הגרסה הנוכחית.</P>
           <P>שימו לב: בדיקות אוטומטיות אינן מכסות את כל קריטריוני התקן. טרם בוצעה בדיקת נגישות מקצועית מלאה (ידנית) על ידי מומחה נגישות מוסמך.</P>
         </>}
         en={<>
           <H>Testing performed</H>
-          <P>On November 6, 2026, on the current build: an automated axe-core scan (WCAG 2.0/2.1/2.2 levels A and AA) across all app screens, including this page - 0 violations found; and a full keyboard-navigation and 320px narrow-screen check - all 6 checks passed.</P>
+          <P>On November 7, 2026, the updated candidate screens were tested in Hebrew at 320px, 390px, and desktop widths, and in English at 390px and desktop widths. An axe-core scan for WCAG 2.0/2.1 levels A and AA found no violations on those screens. Scrolling and focus were also checked so the selection button is not hidden behind the bottom menu. This is not a full audit of every screen in the current build.</P>
           <P>Note: automated checks do not cover every criterion of the standard. A full professional (manual) accessibility audit by a certified expert has not yet been performed.</P>
         </>}
       />
       <Section
         he={<>
           <H>מגבלות ידועות</H>
-          <P>לא נמצאו מגבלות נגישות בבדיקות האוטומטיות של הגרסה הנוכחית. עם זאת, בדיקות אוטומטיות אינן מגלות כל בעיה אפשרית, וטרם בוצעה בדיקה ידנית מקצועית מלאה; אם נתקלתם בבעיה - נשמח שתפנו ונתקן.</P>
+          <P>הבדיקות המתוארות לעיל מוגבלות למסכים ולתנאים שנבדקו. טרם נבדקה מקלדת iOS אמיתית, וטרם בוצעה בדיקה ידנית מקצועית מלאה. אם נתקלתם בבעיה, פנו בערוץ הקשר שיושלם לפני ההשקה.</P>
         </>}
         en={<>
           <H>Known limitations</H>
-          <P>No accessibility limitations were found in the automated checks of the current build. Automated checks cannot catch every possible issue, however, and a full manual professional audit has not yet been performed; if you encounter a problem, please contact us and we will fix it.</P>
+          <P>The checks above cover only the screens and conditions tested. An actual iOS keyboard has not yet been tested, and a full professional manual audit has not been performed. Please report problems through the contact channel to be completed before launch.</P>
         </>}
       />
       <Section
         he={<>
           <H>יצירת קשר בנושא נגישות</H>
-          <P>נתקלתם בבעיית נגישות? פנו אלינו ונטפל: <Blank>[ישולם לפני ההשקה: ערוץ פנייה בנושא נגישות]</Blank></P>
-          <P>רכז נגישות: לא נדרש לפי התקנות (המיזם מועסק בפחות מ-25 עובדים). ניתן לפנות בערוץ הנ"ל.</P>
+          <P>נתקלתם בבעיית נגישות? פנו אלינו ונטפל: <Blank>[יושלם לפני ההשקה: ערוץ פנייה בנושא נגישות]</Blank></P>
+          <P>הצורך במינוי רכז נגישות ותחולת החובות המשפטיות ייבדקו לפני ההשקה. לא נקבעה בטיוטה זו זכאות לפטור.</P>
         </>}
         en={<>
           <H>Accessibility contact</H>
           <P>Encountered an accessibility problem? Contact us and we will handle it: <Blank>[TO FILL BEFORE LAUNCH: accessibility contact channel]</Blank></P>
-          <P>Accessibility coordinator: not required under the regulations (the project employs fewer than 25 people). Please use the channel above.</P>
+          <P>The need for an accessibility coordinator and the applicable legal duties will be checked before launch. This draft does not establish an exemption.</P>
         </>}
       />
     </Shell>
