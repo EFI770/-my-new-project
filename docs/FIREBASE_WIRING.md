@@ -45,12 +45,28 @@ Local node server: same variables via `CHAVRUTA_AUTH_MODE=firebase` + env.
 
 `scripts/test-api-firebase-local.sh` boots a throwaway Postgres, starts the API
 in firebase mode with a LOCAL JWKS override, and runs
-`server/harness/api-firebase.mjs` (18 assertions): garbage/forged/wrong-audience/
+`server/harness/api-firebase.mjs` (25 assertions): garbage/forged/wrong-audience/
 wrong-issuer/expired tokens all 401; register validation (gender + 18+
 attestation mandatory); auth_sub binding incl. re-register 409; same-gender RLS
 visibility; contact-free candidate payloads; providers endpoint shape; deletion
 leaves the user anonymous. All tokens are locally signed RS256 test doubles -
-no vendor contact.
+no vendor contact. The suite also injects a database deletion failure to
+verify rollback preserves the account and removes the uncommitted tombstone;
+it races eight registration attempts against deletion and verifies none can
+recreate the binding. Per-subject advisory transaction locks serialize these
+lifecycle changes. `asService` alone is not transactional: the API explicitly
+begins/commits/rolls back this lifecycle transaction.
+
+`node server/harness/ui-firebase.mjs` runs the local browser with synthetic
+Firebase module and HTTP responses only. It checks retry cancellation and the
+persistent support error, retry success, Google-only forms, and busy-state
+reset after the popup-success early return. These are UI tests, not vendor
+OAuth or real identity-deletion proof.
+
+Firebase documents both recent-sign-in requirements and console user deletion:
+https://firebase.google.com/docs/auth/web/manage-users
+Firebase user state persists across refreshes:
+https://firebase.google.com/docs/auth/users
 
 These tests prove the verification and binding code paths. They do NOT prove
 the live Google OAuth popup flow, authorized-domain config, or real-config

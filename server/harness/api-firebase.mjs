@@ -7,6 +7,7 @@
 // contact-free candidate payloads, and deletion. Synthetic users only.
 // Usage: BASE=http://127.0.0.1:PORT JWKS_PORT=PORT node harness/api-firebase.mjs
 import http from 'node:http';
+import pg from 'pg';
 import { generateKeyPair, SignJWT, exportJWK } from 'jose';
 
 const BASE = (process.env.BASE || 'http://127.0.0.1:4594').replace(/\/$/, '');
@@ -39,7 +40,18 @@ async function mintToken({ sub, email, name, issuer = ISSUER, audience = PROJECT
     .sign(key);
 }
 
-async function api(method, path, { jwt, body } = {}) {
+async function api(method, path, { jwt, body, localAddress } = {}) {
+  if (localAddress) {
+    return new Promise((resolve, reject) => {
+      const req = http.request(`${BASE}${path}`, {method, localAddress, headers: {
+        authorization: `Bearer ${jwt}`, 'content-type': 'application/json',
+      }}, (res) => {
+        let text = ''; res.on('data', b => text += b);
+        res.on('end', () => resolve({status:res.statusCode,data:JSON.parse(text)}));
+      });
+      req.on('error',reject); req.end(JSON.stringify(body));
+    });
+  }
   const r = await fetch(`${BASE}${path}`, {
     method,
     headers: { ...(jwt ? { authorization: `Bearer ${jwt}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
@@ -151,6 +163,38 @@ try {
   createFirebaseAuth({ projectId: PROJECT, jwksUrl: 'http://127.0.0.1:1/evil.json' });
 } catch (e) { threw = e?.message === 'jwks_override_not_allowed'; }
 ok('F17 jwks override without flag throws', threw);
+
+
+// Fault injection: failure AFTER the tombstone INSERT must roll back both
+// tombstone and account deletion. Uses only the throwaway test database.
+const sql = new pg.Client({ host: process.env.PGHOST, database: process.env.PGDATABASE, user: 'postgres' });
+await sql.connect();
+await sql.query(`create function auth.fail_test_delete() returns trigger language plpgsql as $$
+  begin raise exception 'synthetic_delete_failure'; end $$`);
+await sql.query(`create trigger fail_test_delete before delete on auth.users for each row execute function auth.fail_test_delete()`);
+try {
+  const failed = await api('DELETE', '/api/me', { jwt: D.jwt });
+  const stillMember = await api('GET', '/api/me', { jwt: D.jwt });
+  const tomb = await sql.query('select 1 from auth.deleted_subs where auth_sub=$1', [D.sub]);
+  ok('F18 failed delete 500 with member preserved', failed.status === 500 && stillMember.status === 200);
+  ok('F18b failed delete rolls tombstone back', tomb.rowCount === 0);
+} finally {
+  await sql.query('drop trigger fail_test_delete on auth.users');
+  await sql.query('drop function auth.fail_test_delete()');
+}
+// Race existing-member registration replays with deletion. No replay may
+// create a new account, regardless of lock acquisition order.
+const raced = await Promise.all([
+  api('DELETE', '/api/me', { jwt: D.jwt }),
+  ...Array.from({length: 8}, (_, i) => api('POST', '/api/auth/register', {
+    localAddress: `127.0.0.${i+2}`, jwt: D.jwt, body: {displayName: 'race', gender: 'man', attestAdult: true},
+  })),
+]);
+ok('F19 racing delete succeeds; registration never recreates', raced[0].status === 200 && raced.slice(1).every(r => [403,409].includes(r.status)), JSON.stringify(raced.map(r=>r.status)));
+const replay = await api('POST', '/api/auth/register', {localAddress:'127.0.0.20',jwt:D.jwt,body:{displayName:'race',gender:'man',attestAdult:true}});
+const binding = await sql.query('select 1 from auth.users where auth_sub=$1',[D.sub]);
+ok('F19b replay remains blocked and binding absent', replay.status === 403 && binding.rowCount === 0);
+await sql.end();
 
 await new Promise((r) => jwksServer.close(r));
 console.log(`PASS=${pass} FAIL=${fail}`);

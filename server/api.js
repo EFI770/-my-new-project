@@ -32,6 +32,24 @@ const vendorAuth = neonAuth || firebaseAuth;
 
 const db = config.db;
 
+// asService only acquires a client. Lifecycle mutations explicitly own their
+// transaction and lock, including rollback on every error.
+async function vendorTransaction(sub, fn) {
+  return db.asService(async (c) => {
+    await c.query('begin');
+    try {
+      await c.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [sub]);
+      const result = await fn(c);
+      await c.query('commit');
+      return result;
+    } catch (err) {
+      await c.query('rollback').catch(() => {});
+      throw err;
+    }
+  });
+}
+
+
 // Same-origin proxy to the Neon Auth vendor (Neon mode only). The vendor
 // session cookie stays first-party. The REAL incoming Origin is forwarded
 // unchanged; the app origin must be allowlisted under the vendor's trusted
@@ -209,7 +227,7 @@ route('POST', '/api/auth/register', async (req, res) => {
     // Adults-only pilot: explicit 18+ self-attestation is mandatory. Stored as
     // a timestamp only - no date of birth or ID is collected.
     if (body.attestAdult !== true) return send(res, 400, { error: 'age_attestation_required' });
-    const created = await db.asService(async (c) => {
+    const created = await vendorTransaction(payload.sub, async (c) => {
       // Deletion tombstone: a deleted vendor subject cannot re-register while
       // its (still-valid) vendor token survives. Operator clears the row.
       const tomb = await c.query('select 1 from auth.deleted_subs where auth_sub = $1', [payload.sub]);
@@ -357,7 +375,7 @@ route('GET', '/api/auth/providers', async (req, res) => {
     // Community mode defaults to Google-only registration (owner's expressed
     // preference 2026-11-06 11:59 IST); EMAIL_AUTH_ENABLED=true opts back in.
     // Dev emulator keeps email/password for local testing.
-    email: { enabled: !DEMO_ENABLED && (AUTH_MODE !== 'neon' || ENV.EMAIL_AUTH_ENABLED === 'true') },
+    email: { enabled: !DEMO_ENABLED && (!vendorAuth || (AUTH_MODE === 'neon' && ENV.EMAIL_AUTH_ENABLED === 'true')) },
     demo: { enabled: DEMO_ENABLED },
     firebase: {
       // Google sign-in via Firebase Authentication (owner decision 2026-11-07,
@@ -460,7 +478,7 @@ route('DELETE', '/api/me', async (req, res, user) => {
   // selections and connection requests; reports filed BY the user are removed,
   // reports ABOUT the user keep null user reference.
   let authSub = null;
-  await db.asService(async (c) => {
+  const mutate = async (c) => {
     if (vendorAuth) {
       // auth_sub exists only where the vendor binding migration (0005) ran.
       const { rows } = await c.query('select auth_sub from auth.users where id = $1', [user.id]);
@@ -471,7 +489,9 @@ route('DELETE', '/api/me', async (req, res, user) => {
     }
     await c.query('delete from auth.users where id = $1', [user.id]);
     if (!vendorAuth) await c.query('delete from dev_auth.users where id = $1', [user.id]);
-  });
+  };
+  if (vendorAuth) await vendorTransaction(user.sub, mutate);
+  else await db.asService(mutate);
   // Neon mode: erase the vendor identity record too (management API only), so
   // account deletion is complete. Local data is already gone either way; a
   // vendor failure is logged and reported, never hidden. 404 counts as deleted

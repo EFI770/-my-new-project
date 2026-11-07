@@ -56,4 +56,4 @@ for i in $(seq 1 50); do
   curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1 && break
   sleep 0.2
 done
-BASE="http://127.0.0.1:$PORT" JWKS_PORT="$JWKS_PORT" node server/harness/api-firebase.mjs
+PGHOST="$SOCK" PGDATABASE="$DB" BASE="http://127.0.0.1:$PORT" JWKS_PORT="$JWKS_PORT" node server/harness/api-firebase.mjs

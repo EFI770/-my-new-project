@@ -49,11 +49,11 @@ export async function deleteFirebaseUser() {
   const u = auth && auth.currentUser;
   if (!u) return;
   try {
-    await u.delete();
+    await mod.deleteUser(u);
   } catch (e) {
     if (e && e.code === 'auth/requires-recent-login') {
       await mod.reauthenticateWithPopup(u, new mod.GoogleAuthProvider());
-      await u.delete();
+      await mod.deleteUser(u);
     } else {
       throw e;
     }

@@ -86,8 +86,9 @@ export default function AuthScreen() {
       setError(t('oauthStartFailed'));
     } catch {
       setError(t('oauthStartFailed'));
+    } finally {
+      setOauthBusy(false);
     }
-    setOauthBusy(false);
   }
 
   // Leaving the Google registration variant abandons the unregistered vendor
@@ -178,8 +179,9 @@ export default function AuthScreen() {
         {t('authPrivacy')}
       </div>
 
-      {!(providers?.demo?.enabled && providers?.email?.enabled === false) && (
+      {(googleUser || providers?.email?.enabled) && (
       <>
+      {!providers?.firebase?.enabled && (
       <div className="mt-5 grid grid-cols-2 rounded-full bg-cream-2 p-1">
         {[['login', t('login')], ['register', t('register')]].map(([k, label]) => (
           <button
@@ -193,6 +195,7 @@ export default function AuthScreen() {
         ))}
       </div>
 
+      )}
       <form onSubmit={submit} className="space-y-4 pt-6">
         {mode === 'register' && (
           <>
@@ -270,7 +273,7 @@ export default function AuthScreen() {
         </label>
         </>
         )}
-        {error && <div role="alert" className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] text-[#991b1b]">{error}</div>}
+
         <button
           type="submit"
           disabled={busy}
@@ -302,6 +305,7 @@ export default function AuthScreen() {
           </div>
         </div>
       )}
+        {error && <div role="alert" className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] text-[#991b1b]">{error}</div>}
       {pendingVendor && !googleUser && (
         <div className="pt-4 space-y-2">
           <p className="rounded-xl bg-cream-2 px-4 py-3 text-[12px] leading-5 text-ink-2">{t('vendorSessionNote')}</p>
