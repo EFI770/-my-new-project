@@ -3,15 +3,16 @@ main = "index.js"
 compatibility_date = "2026-11-06"
 compatibility_flags = ["nodejs_compat"]
 
-# Private preview: fail-closed app-level gate (PREVIEW_GATE_KEY secret),
-# synthetic dev-auth accounts only, Google sign-in disabled at the API layer.
+# Gated real-Firebase acceptance build. Public opening awaits owner sign-in verification.
 [vars]
-PREVIEW_MODE = "private-synthetic"
+PREVIEW_MODE = "private-firebase"
 # Synthetic demo entry for THIS gated preview only (scrypt exceeds the Workers
 # Free 10ms CPU limit, so real register/login cannot run on the free runtime).
 # The route exists only when this is 'true' AND auth mode is not 'neon'.
 # REMOVE for any production deployment.
-PREVIEW_DEMO_MODE = "true"
+PREVIEW_DEMO_MODE = "false"
+AUTH_MODE = "firebase"
+FIREBASE_SIGNIN_ENABLED = "true"
 
 # run_worker_first: without it, requests matching a static file are served by
 # the assets layer BEFORE the worker runs - which would bypass the preview
