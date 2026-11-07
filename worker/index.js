@@ -107,7 +107,9 @@ function getApi(env) {
     apiHandler = createApiHandler({
       authMode,
       firebaseProjectId: env.FIREBASE_PROJECT_ID,
-      firebaseJwksUrl: env.FIREBASE_JWKS_URL, // hermetic-test override only
+      // No JWKS override here on purpose: the deployment path always verifies
+      // against Google's real securetoken JWKS. The hermetic-test override
+      // exists only in server/server.js behind CHAVRUTA_FIREBASE_TEST=hermetic.
       firebaseClient: env.FIREBASE_API_KEY ? {
         apiKey: env.FIREBASE_API_KEY,
         authDomain: env.FIREBASE_AUTH_DOMAIN || (env.FIREBASE_PROJECT_ID ? `${env.FIREBASE_PROJECT_ID}.firebaseapp.com` : undefined),

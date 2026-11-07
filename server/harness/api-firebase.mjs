@@ -134,6 +134,24 @@ ok('F14 delete 200', del.status === 200, `got ${del.status}`);
 const afterA = await api('GET', '/api/me', { jwt: A.jwt });
 ok('F14b deleted user is anonymous again', afterA.status === 401);
 
+// F15 tombstone: the still-valid token of the deleted user CANNOT re-register
+const reReg = await api('POST', '/api/auth/register', { jwt: A.jwt, body: { displayName: 'אבי אשכנזי', gender: 'man', attestAdult: true } });
+ok('F15 deleted+still-valid token re-register 403 account_deleted', reReg.status === 403 && reReg.data?.error === 'account_deleted', JSON.stringify(reReg));
+
+// F16 no over-blocking: a different vendor subject still registers fine
+const D = { sub: `uid-d-${RUN}`, email: `d-${RUN}@example.com` };
+D.jwt = await mintToken(D);
+const rD = await api('POST', '/api/auth/register', { jwt: D.jwt, body: { displayName: 'דוד שלום', gender: 'man', attestAdult: true } });
+ok('F16 fresh subject still registers 201', rD.status === 201);
+
+// F17 JWKS override is fail-closed without the explicit hermetic flag
+let threw = false;
+try {
+  const { createFirebaseAuth } = await import('../firebaseAuth.js');
+  createFirebaseAuth({ projectId: PROJECT, jwksUrl: 'http://127.0.0.1:1/evil.json' });
+} catch (e) { threw = e?.message === 'jwks_override_not_allowed'; }
+ok('F17 jwks override without flag throws', threw);
+
 await new Promise((r) => jwksServer.close(r));
 console.log(`PASS=${pass} FAIL=${fail}`);
 process.exit(fail ? 1 : 0);

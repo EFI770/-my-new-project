@@ -39,11 +39,12 @@ create unique index auth_users_auth_sub_key on auth.users(auth_sub) where auth_s
 grant usage on schema public to anon, authenticated;
 grant usage on schema auth to anon, authenticated;
 SQL
-for f in supabase/migrations/0001_initial_schema.sql supabase/migrations/0002_contact_consent_and_blocks.sql supabase/migrations/0003_private_interests_and_contact_disclosure.sql supabase/migrations/0004_gender_separation.sql supabase/migrations/0006_age_attestation.sql; do
+for f in supabase/migrations/0001_initial_schema.sql supabase/migrations/0002_contact_consent_and_blocks.sql supabase/migrations/0003_private_interests_and_contact_disclosure.sql supabase/migrations/0004_gender_separation.sql supabase/migrations/0006_age_attestation.sql supabase/migrations/0007_vendor_deletion_tombstones.sql; do
   psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f "$f"
 done
 
 CHAVRUTA_AUTH_MODE=firebase \
+CHAVRUTA_FIREBASE_TEST=hermetic \
 FIREBASE_PROJECT_ID=chavruta-hermetic-test \
 FIREBASE_JWKS_URL="http://127.0.0.1:$JWKS_PORT/jwks.json" \
 FIREBASE_SIGNIN_ENABLED=true \

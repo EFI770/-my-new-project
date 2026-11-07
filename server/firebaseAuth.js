@@ -9,9 +9,13 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const DEFAULT_JWKS = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 
-export function createFirebaseAuth({ projectId, jwksUrl }) {
+export function createFirebaseAuth({ projectId, jwksUrl, allowJwksOverride }) {
   if (!projectId) throw new Error('firebase_project_id_required');
-  // jwksUrl override exists ONLY for hermetic tests (local JWKS server).
+  // jwksUrl override exists ONLY for hermetic tests (local JWKS server). It is
+  // a deployment-config bypass: a production env that points JWKS elsewhere
+  // would let an attacker mint valid-looking tokens, so it must be explicitly
+  // enabled and is never wired in the Worker deployment path.
+  if (jwksUrl && allowJwksOverride !== true) throw new Error('jwks_override_not_allowed');
   const JWKS = createRemoteJWKSet(new URL(jwksUrl || DEFAULT_JWKS));
   async function verify(token) {
     const { payload } = await jwtVerify(token, JWKS, {

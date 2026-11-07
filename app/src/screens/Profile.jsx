@@ -59,12 +59,16 @@ export default function Profile() {
   async function deleteAccount() {
     try {
       // Order matters: server data goes first (the ID token is still valid),
-      // then the Firebase identity record is erased client-side. If the
-      // vendor erasure fails, local data is still gone and the session ends.
+      // then the Firebase identity record is erased client-side. A vendor
+      // erasure failure (network, cancelled re-auth popup) is shown honestly:
+      // app data is gone either way, but the user hears the vendor record may
+      // remain instead of a silent console log.
       await api.deleteAccount();
-      try { await deleteFirebaseUser(); } catch { /* vendor record erasure failed; local data deleted */ }
+      let vendorErased = true;
+      try { await deleteFirebaseUser(); } catch { vendorErased = false; }
       await signOutFirebase();
       await refreshMe();
+      if (!vendorErased) showToast(t('deletePartialVendor'));
     } catch (err) { showToast(errText(t, err)); }
   }
 

@@ -18,7 +18,10 @@ const PORT = Number(process.env.PORT || 4173);
 const api = createApiHandler({
   authMode: process.env.CHAVRUTA_AUTH_MODE || 'dev',
   firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
-  firebaseJwksUrl: process.env.FIREBASE_JWKS_URL, // hermetic-test override only
+  // Hermetic-test override only, and only when the test flag is explicit;
+  // firebaseAuth throws if a JWKS override arrives without it.
+  firebaseJwksUrl: process.env.CHAVRUTA_FIREBASE_TEST === 'hermetic' ? process.env.FIREBASE_JWKS_URL : undefined,
+  firebaseAllowJwksOverride: process.env.CHAVRUTA_FIREBASE_TEST === 'hermetic',
   firebaseClient: process.env.FIREBASE_API_KEY ? {
     apiKey: process.env.FIREBASE_API_KEY,
     authDomain: process.env.FIREBASE_AUTH_DOMAIN || `${process.env.FIREBASE_PROJECT_ID}.firebaseapp.com`,

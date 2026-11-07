@@ -33,7 +33,11 @@ Worker (`AUTH_MODE=firebase`):
 - `FIREBASE_API_KEY`, `FIREBASE_APP_ID` - public web config values (from the
   Firebase console; keep in secrets store anyway, per project policy).
 - `FIREBASE_AUTH_DOMAIN` - optional; defaults to `<projectId>.firebaseapp.com`.
-- `FIREBASE_JWKS_URL` - hermetic-test override ONLY. Never set in production.
+- `FIREBASE_JWKS_URL` + `CHAVRUTA_FIREBASE_TEST=hermetic` - hermetic-test JWKS
+  override ONLY. Both must be set together; `createFirebaseAuth` throws
+  (`jwks_override_not_allowed`) when a JWKS override arrives without the flag,
+  and the Worker deployment path never passes an override at all. Never set in
+  production: a hostile JWKS URL would let an attacker mint valid-looking tokens.
 
 Local node server: same variables via `CHAVRUTA_AUTH_MODE=firebase` + env.
 
@@ -58,9 +62,21 @@ on a gated preview.
 `DELETE /api/me` removes all app data and the auth_sub binding first (the ID
 token is still valid at that point), then the CLIENT erases the Firebase
 identity record (`user.delete()`, re-authenticating via a fresh Google popup if
-Firebase requires a recent sign-in). If the vendor erasure fails, local data is
-still gone and the session ends; the failure is not hidden. Server-side vendor
-erasure is impossible by design (no admin credentials held).
+Firebase requires a recent sign-in). Server-side vendor erasure is impossible
+by design (no admin credentials held).
+
+Invalidation policy (migration 0007): the deleted vendor subject is TOMBSTONED
+(`auth.deleted_subs`) in the same transaction as the data delete. A still-valid
+token (Firebase ID tokens live ~1h) cannot re-register the deleted account -
+register returns 403 `account_deleted`. A returning user asks the operator to
+clear the tombstone row (pilot scale makes this practical). Fail-closed by
+default.
+
+Honest partial failure: if the client-side vendor erasure fails (network, or
+the user cancels the re-auth popup), app data is still gone and the session
+ends, and the UI tells the user the sign-in record may remain, with the manual
+removal path (Google Account > Security > connections). It is not a silent
+console log. Identity erasure at the vendor is NOT claimed verified.
 
 ## Owner console steps (one-time)
 

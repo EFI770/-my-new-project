@@ -24,6 +24,7 @@ const neonAuth = AUTH_MODE === 'neon' ? createNeonAuth({
 const firebaseAuth = AUTH_MODE === 'firebase' ? createFirebaseAuth({
   projectId: config.firebaseProjectId,
   jwksUrl: config.firebaseJwksUrl,
+  allowJwksOverride: config.firebaseAllowJwksOverride === true,
 }) : null;
 // Vendor JWT mode (Neon Auth or Firebase): stateless Bearer-token sessions,
 // register binds the verified sub. Everything vendor-generic keys off this.
@@ -209,12 +210,17 @@ route('POST', '/api/auth/register', async (req, res) => {
     // a timestamp only - no date of birth or ID is collected.
     if (body.attestAdult !== true) return send(res, 400, { error: 'age_attestation_required' });
     const created = await db.asService(async (c) => {
+      // Deletion tombstone: a deleted vendor subject cannot re-register while
+      // its (still-valid) vendor token survives. Operator clears the row.
+      const tomb = await c.query('select 1 from auth.deleted_subs where auth_sub = $1', [payload.sub]);
+      if (tomb.rows.length) return 'tombstoned';
       const existing = await c.query('select id from auth.users where auth_sub = $1', [payload.sub]);
       if (existing.rows.length) return null;
       const { rows } = await c.query(
         'insert into auth.users (id, auth_sub) values (gen_random_uuid(), $1) returning id', [payload.sub]);
       return rows[0].id;
     });
+    if (created === 'tombstoned') return send(res, 403, { error: 'account_deleted' });
     if (!created) return send(res, 409, { error: 'already_registered' });
     await db.withRls(created, (c) => c.query(
       'insert into public.profiles (id, display_name, gender, age_attested_at) values ($1, $2, $3, now())', [created, displayName, gender]));
@@ -459,6 +465,9 @@ route('DELETE', '/api/me', async (req, res, user) => {
       // auth_sub exists only where the vendor binding migration (0005) ran.
       const { rows } = await c.query('select auth_sub from auth.users where id = $1', [user.id]);
       authSub = rows[0] && rows[0].auth_sub || null;
+      // Tombstone the vendor subject so its still-valid token cannot
+      // immediately re-register the account the user just deleted (0007).
+      if (authSub) await c.query('insert into auth.deleted_subs (auth_sub) values ($1) on conflict do nothing', [authSub]);
     }
     await c.query('delete from auth.users where id = $1', [user.id]);
     if (!vendorAuth) await c.query('delete from dev_auth.users where id = $1', [user.id]);
