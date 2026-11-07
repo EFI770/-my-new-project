@@ -203,6 +203,23 @@ ok('F19 racing delete succeeds; registration never recreates', raced[0].status =
 const replay = await api('POST', '/api/auth/register', {localAddress:'127.0.0.20',jwt:D.jwt,body:{displayName:'race',gender:'man',attestAdult:true}});
 const binding = await sql.query('select 1 from auth.users where auth_sub=$1',[D.sub]);
 ok('F19b replay remains blocked and binding absent', replay.status === 403 && binding.rowCount === 0);
+// Registration fault must leave neither a binding nor a profile. A retry
+// after the fault is removed must work without operator database repair.
+const E = {sub: `uid-e-${RUN}`}; E.jwt = await mintToken(E);
+await sql.query(`create function public.fail_test_profile() returns trigger language plpgsql as $$
+ begin raise exception 'synthetic_profile_failure'; end $$`);
+await sql.query(`create trigger fail_test_profile before insert on public.profiles for each row execute function public.fail_test_profile()`);
+try {
+ const failedSignup = await api('POST','/api/auth/register',{localAddress:'127.0.0.21',jwt:E.jwt,body:{displayName:'rollback',gender:'man',attestAdult:true}});
+ const partial = await sql.query('select 1 from auth.users where auth_sub=$1',[E.sub]);
+ ok('F21 failed profile insert rolls back vendor binding',failedSignup.status===500 && partial.rowCount===0);
+} finally {
+ await sql.query('drop trigger fail_test_profile on public.profiles');
+ await sql.query('drop function public.fail_test_profile()');
+}
+const signupRetry=await api('POST','/api/auth/register',{localAddress:'127.0.0.22',jwt:E.jwt,body:{displayName:'retry',gender:'man',attestAdult:true}});
+const complete=await sql.query('select p.id from public.profiles p join auth.users u on p.id=u.id where u.auth_sub=$1',[E.sub]);
+ok('F21b signup retry succeeds with complete profile',signupRetry.status===201 && complete.rowCount===1);
 await sql.end();
 
 await new Promise((r) => jwksServer.close(r));

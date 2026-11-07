@@ -253,12 +253,18 @@ route('POST', '/api/auth/register', async (req, res) => {
       if (existing.rows.length) return null;
       const { rows } = await c.query(
         'insert into auth.users (id, auth_sub) values (gen_random_uuid(), $1) returning id', [payload.sub]);
-      return rows[0].id;
+      const id = rows[0].id;
+      // Keep binding and initial profile atomic under the same subject lock.
+      // Switch this transaction to the ordinary user's RLS context before
+      // inserting profile data, rather than using service privileges for it.
+      await c.query('set local role authenticated');
+      await c.query(`select set_config('app.sub', $1, true)`, [id]);
+      await c.query(
+        'insert into public.profiles (id, display_name, gender, age_attested_at) values ($1, $2, $3, now())', [id, displayName, gender]);
+      return id;
     });
     if (created === 'tombstoned') return send(res, 403, { error: 'account_deleted' });
     if (!created) return send(res, 409, { error: 'already_registered' });
-    await db.withRls(created, (c) => c.query(
-      'insert into public.profiles (id, display_name, gender, age_attested_at) values ($1, $2, $3, now())', [created, displayName, gender]));
     return send(res, 201, { userId: created });
   }
   const body = await readBody(req);
