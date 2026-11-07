@@ -21,8 +21,16 @@ export function createFirebaseAuth({ projectId, jwksUrl, allowJwksOverride }) {
     const { payload } = await jwtVerify(token, JWKS, {
       issuer: `https://securetoken.google.com/${projectId}`,
       audience: projectId,
+      algorithms: ['RS256'],
+      requiredClaims: ['sub', 'exp', 'iat', 'auth_time'],
     });
-    if (!payload.sub) throw Object.assign(new Error('no_sub'), { status: 401 });
+    const now = Math.floor(Date.now() / 1000);
+    if (typeof payload.sub !== 'string' || !payload.sub.trim() || payload.sub.length > 128
+      || !Number.isInteger(payload.iat) || payload.iat > now
+      || !Number.isInteger(payload.auth_time) || payload.auth_time > now
+      || payload.auth_time > payload.iat || !Number.isInteger(payload.exp)) {
+      throw Object.assign(new Error('invalid_token_claims'), { status: 401 });
+    }
     return payload; // sub (Firebase uid), email, name
   }
   return { verify };

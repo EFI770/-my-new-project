@@ -31,7 +31,7 @@ const jwksServer = http.createServer((req, res) => {
 await new Promise((r) => jwksServer.listen(JWKS_PORT, '127.0.0.1', r));
 
 async function mintToken({ sub, email, name, issuer = ISSUER, audience = PROJECT, expiresIn = '1h', key = privateKey, kid = 'hermetic-key-1' }) {
-  return new SignJWT({ sub, email: email || `${sub}@example.com`, name: name || sub, email_verified: true })
+  return new SignJWT({ sub, email: email || `${sub}@example.com`, name: name || sub, email_verified: true, auth_time: Math.floor(Date.now() / 1000) })
     .setProtectedHeader({ alg: 'RS256', kid })
     .setIssuedAt()
     .setIssuer(issuer)
