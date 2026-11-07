@@ -6,6 +6,7 @@
 import { mapPgError } from './db.js';
 import { hashPassword, verifyPassword, newSessionToken, sessionExpiry } from './devAuth.js';
 import { createNeonAuth } from './neonAuth.js';
+import { createFirebaseAuth } from './firebaseAuth.js';
 
 // Runtime-agnostic API core: same code runs as a local listener (server.js)
 // and inside a hosted fetch runtime (../worker/index.js). All configuration
@@ -18,6 +19,15 @@ const neonAuth = AUTH_MODE === 'neon' ? createNeonAuth({
   issuer: config.neonIssuer,
   audience: config.neonAudience,
 }) : null;
+// Firebase Authentication community mode: same vendor-JWT shape as Neon mode
+// (Bearer ID token -> verified sub -> auth.users.auth_sub), different issuer.
+const firebaseAuth = AUTH_MODE === 'firebase' ? createFirebaseAuth({
+  projectId: config.firebaseProjectId,
+  jwksUrl: config.firebaseJwksUrl,
+}) : null;
+// Vendor JWT mode (Neon Auth or Firebase): stateless Bearer-token sessions,
+// register binds the verified sub. Everything vendor-generic keys off this.
+const vendorAuth = neonAuth || firebaseAuth;
 
 const db = config.db;
 
@@ -119,11 +129,11 @@ function cookies(req) {
 }
 
 async function sessionUser(req) {
-  if (AUTH_MODE === 'neon') {
+  if (vendorAuth) {
     const token = (req.headers.authorization || '').replace(/^Bearer /i, '') || null;
     if (!token) return null;
     let payload;
-    try { payload = await neonAuth.verify(token); } catch { return null; }
+    try { payload = await vendorAuth.verify(token); } catch { return null; }
     // Bind the verified vendor subject to the one app user it owns.
     const row = await db.asService(async (c) => {
       const { rows } = await c.query('select id from auth.users where auth_sub = $1', [payload.sub]);
@@ -182,14 +192,14 @@ route('POST', '/api/auth/register', async (req, res) => {
   // merely CPU-infeasible): scrypt exceeds the Workers Free 10ms CPU limit,
   // so on this runtime register/login are disabled by construction.
   if (DEMO_ENABLED) return send(res, 403, { error: 'demo_preview_only' });
-  if (AUTH_MODE === 'neon') {
-    // Vendor mode: the user already signed up with Neon Auth and presents its
-    // JWT. We bind the verified `sub` to a new app user + profile. No password
-    // ever touches this server.
+  if (vendorAuth) {
+    // Vendor mode: the user already signed in with the auth vendor (Neon Auth
+    // or Firebase) and presents its JWT/ID token. We bind the verified `sub`
+    // to a new app user + profile. No password ever touches this server.
     const token = (req.headers.authorization || '').replace(/^Bearer /i, '') || null;
     if (!token) return send(res, 401, { error: 'authentication_required' });
     let payload;
-    try { payload = await neonAuth.verify(token); } catch { return send(res, 401, { error: 'authentication_required' }); }
+    try { payload = await vendorAuth.verify(token); } catch { return send(res, 401, { error: 'authentication_required' }); }
     const body = await readBody(req);
     const displayName = cleanStr(body.displayName, 80);
     const gender = GENDERS.has(body.gender) ? body.gender : null;
@@ -250,7 +260,7 @@ route('POST', '/api/auth/register', async (req, res) => {
 });
 
 route('POST', '/api/auth/login', async (req, res) => {
-  if (AUTH_MODE === 'neon') return send(res, 400, { error: 'use_vendor_auth' });
+  if (vendorAuth) return send(res, 400, { error: 'use_vendor_auth' });
   if (DEMO_ENABLED) return send(res, 403, { error: 'demo_preview_only' });
   if (rateLimited(`login:${req.socket.remoteAddress}`, 20, 600_000)) return send(res, 429, { error: 'rate_limited' });
   const body = await readBody(req);
@@ -274,7 +284,7 @@ route('POST', '/api/auth/login', async (req, res) => {
 });
 
 route('POST', '/api/auth/logout', async (req, res) => {
-  if (AUTH_MODE === 'neon') return send(res, 200, { ok: true });
+  if (vendorAuth) return send(res, 200, { ok: true });
   const token = cookies(req).dev_session;
   if (token) await db.asService((c) => c.query('delete from dev_auth.sessions where token = $1', [token]));
   send(res, 200, { ok: true }, { 'set-cookie': 'dev_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
@@ -289,7 +299,7 @@ route('POST', '/api/auth/logout', async (req, res) => {
 // TWO FIXED seeded synthetic identities only - no arbitrary userId, no
 // password (password login stays impossible for these rows), no real user
 // data. NEVER enable outside a gated synthetic preview.
-const DEMO_ENABLED = ENV.PREVIEW_DEMO_MODE === 'true' && AUTH_MODE !== 'neon';
+const DEMO_ENABLED = ENV.PREVIEW_DEMO_MODE === 'true' && !vendorAuth;
 const DEMO_IDENTITIES = {
   // Two same-gender pairs so the match/request/consent/contact flow is
   // exercisable end-to-end between login identities (matching is same-gender
@@ -343,6 +353,15 @@ route('GET', '/api/auth/providers', async (req, res) => {
     // Dev emulator keeps email/password for local testing.
     email: { enabled: !DEMO_ENABLED && (AUTH_MODE !== 'neon' || ENV.EMAIL_AUTH_ENABLED === 'true') },
     demo: { enabled: DEMO_ENABLED },
+    firebase: {
+      // Google sign-in via Firebase Authentication (owner decision 2026-11-07,
+      // replaces the Neon-Auth Google plan). The web config values are public
+      // by design (Google docs: Firebase API keys identify the project, they
+      // are not access-control secrets) and ship to every visitor regardless;
+      // they are served from env here, never committed to the repo.
+      enabled: ENV.FIREBASE_SIGNIN_ENABLED === 'true' && !!config.firebaseClient,
+      config: ENV.FIREBASE_SIGNIN_ENABLED === 'true' ? (config.firebaseClient || null) : null,
+    },
     google: {
       enabled: ENV.GOOGLE_SIGNIN_ENABLED === 'true' && !!ENV.NEON_AUTH_URL,
       // Neon mode: same-origin proxy path so the vendor session cookie is
@@ -436,13 +455,13 @@ route('DELETE', '/api/me', async (req, res, user) => {
   // reports ABOUT the user keep null user reference.
   let authSub = null;
   await db.asService(async (c) => {
-    if (AUTH_MODE === 'neon') {
+    if (vendorAuth) {
       // auth_sub exists only where the vendor binding migration (0005) ran.
       const { rows } = await c.query('select auth_sub from auth.users where id = $1', [user.id]);
       authSub = rows[0] && rows[0].auth_sub || null;
     }
     await c.query('delete from auth.users where id = $1', [user.id]);
-    if (AUTH_MODE !== 'neon') await c.query('delete from dev_auth.users where id = $1', [user.id]);
+    if (!vendorAuth) await c.query('delete from dev_auth.users where id = $1', [user.id]);
   });
   // Neon mode: erase the vendor identity record too (management API only), so
   // account deletion is complete. Local data is already gone either way; a
@@ -692,7 +711,7 @@ route('POST', '/api/reports', async (req, res, user) => {
   send(res, 201, { ok: true });
 });
 
-route('GET', '/api/health', async (req, res) => send(res, 200, { ok: true, mode: AUTH_MODE === 'neon' ? 'neon-vendor' : 'dev-emulator' }));
+route('GET', '/api/health', async (req, res) => send(res, 200, { ok: true, mode: AUTH_MODE === 'neon' ? 'neon-vendor' : AUTH_MODE === 'firebase' ? 'firebase-vendor' : 'dev-emulator' }));
 
 // Request handler is exported so the same code can run as a long-lived
 // local listener (dev) or be invoked per-request by a serverless runtime

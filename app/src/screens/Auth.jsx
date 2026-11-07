@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { initFirebase, signInWithGoogle, signOutFirebase } from '../firebase.js';
 import { errText, useLang, useLabels } from '../i18n.jsx';
 import { useApp, LangSwitch } from '../App.jsx';
 
@@ -18,15 +19,40 @@ export default function AuthScreen() {
   // server reports the vendor provider configured. Disabled by default.
   const [providers, setProviders] = useState(null);
   const [oauthBusy, setOauthBusy] = useState(false);
+  // Set after a successful Firebase Google sign-in when the server says the
+  // identity is not registered yet: the form switches to the vendor-register
+  // variant (name/gender/18+ only, no email/password) and registers with the
+  // verified ID token.
+  const [googleUser, setGoogleUser] = useState(null);
   useEffect(() => { api.providers().then(setProviders).catch(() => {}); }, []);
 
-  // Neon Auth (Better Auth) social flow is POST-then-redirect: the endpoint
-  // returns {url} and the browser must navigate there. Verified against the
-  // live vendor 2026-11-06 (GET on the endpoint is 404; POST returns init URL).
   async function googleSignIn() {
     setOauthBusy(true);
     setError(null);
     try {
+      if (providers?.firebase?.enabled && providers.firebase.config) {
+        // Firebase route: popup sign-in, then check whether this identity is
+        // already registered with the community.
+        await initFirebase(providers.firebase.config);
+        const user = await signInWithGoogle();
+        try {
+          await api.me();
+          showToast(t('toastWelcome'));
+          await refreshMe();
+          navigate('find');
+          return;
+        } catch (e) {
+          if (e?.status !== 401) throw e;
+          setGoogleUser(user);
+          setDisplayName(user.displayName || '');
+          setMode('register');
+          return;
+        }
+      }
+      // Legacy Neon Auth (Better Auth) social flow is POST-then-redirect:
+      // the endpoint returns {url} and the browser must navigate there.
+      // Verified against the live vendor 2026-11-06 (GET is 404; POST returns
+      // the init URL).
       const r = await fetch(`${providers.google.authUrl}/sign-in/social`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -39,6 +65,16 @@ export default function AuthScreen() {
       setError(t('oauthStartFailed'));
     }
     setOauthBusy(false);
+  }
+
+  // Leaving the Google registration variant abandons the unregistered vendor
+  // session, so no dangling signed-in-but-unregistered identity lingers.
+  async function switchMode(k) {
+    if (googleUser && k !== 'register') {
+      await signOutFirebase();
+      setGoogleUser(null);
+    }
+    setMode(k); setError(null);
   }
   const [busy, setBusy] = useState(false);
 
@@ -71,6 +107,22 @@ export default function AuthScreen() {
     }
     setBusy(true);
     try {
+      if (googleUser) {
+        // Vendor registration: the Bearer ID token is attached by the token
+        // provider; the server binds the verified subject. No password.
+        try {
+          await api.register({ displayName, gender, attestAdult });
+          showToast(t('toastRegistered'));
+        } catch (err) {
+          // Already registered on the server (e.g. earlier attempt): just enter.
+          if (err?.code !== 'already_registered') throw err;
+          showToast(t('toastWelcome'));
+        }
+        setGoogleUser(null);
+        await refreshMe();
+        navigate('find');
+        return;
+      }
       if (mode === 'register') {
         await api.register({ email, password, displayName, gender, attestAdult });
         showToast(t('toastRegistered'));
@@ -108,7 +160,7 @@ export default function AuthScreen() {
         {[['login', t('login')], ['register', t('register')]].map(([k, label]) => (
           <button
             key={k}
-            onClick={() => { setMode(k); setError(null); }}
+            onClick={() => switchMode(k)}
             aria-pressed={mode === k}
             className={`rounded-full py-2 text-[14px] ${mode === k ? 'bg-white font-semibold text-green-dark shadow-sm' : 'text-ink-2'}`}
           >
@@ -163,6 +215,11 @@ export default function AuthScreen() {
             </label>
           </>
         )}
+        {googleUser && (
+          <p className="rounded-xl bg-cream-2 px-4 py-3 text-[12px] leading-5 text-ink-2">{t('googleSignupNote')}</p>
+        )}
+        {!googleUser && (
+        <>
         <label className="block">
           <span className="text-[13px] font-medium text-ink">{t('email')}</span>
           <input
@@ -187,13 +244,15 @@ export default function AuthScreen() {
           />
           {mode === 'register' && <span className="text-[11px] text-ink-2">{t('passwordHint')}</span>}
         </label>
+        </>
+        )}
         {error && <div role="alert" className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] text-[#991b1b]">{error}</div>}
         <button
           type="submit"
           disabled={busy}
           className="w-full rounded-full bg-green-dark py-3 text-[15px] font-semibold text-white disabled:opacity-60"
         >
-          {busy ? t('busy') : mode === 'register' ? t('register') : t('login')}
+          {busy ? t('busy') : googleUser ? t('finishSignup') : mode === 'register' ? t('register') : t('login')}
         </button>
       </form>
       </>
@@ -219,7 +278,7 @@ export default function AuthScreen() {
           </div>
         </div>
       )}
-      {providers?.google?.enabled && providers.google.authUrl && (
+      {((providers?.firebase?.enabled && providers.firebase.config) || (providers?.google?.enabled && providers.google.authUrl)) && (
         <div className="pt-4">
           <button
             type="button"

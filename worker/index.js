@@ -103,9 +103,17 @@ function getApi(env) {
     // gated preview), 'neon' = vendor Google sign-in (community build). The
     // preview deployment ships with AUTH_MODE unset/'dev'; the community
     // deploy sets AUTH_MODE=neon plus the Neon Auth values.
-    const authMode = env.AUTH_MODE === 'neon' ? 'neon' : 'dev';
+    const authMode = env.AUTH_MODE === 'firebase' ? 'firebase' : env.AUTH_MODE === 'neon' ? 'neon' : 'dev';
     apiHandler = createApiHandler({
       authMode,
+      firebaseProjectId: env.FIREBASE_PROJECT_ID,
+      firebaseJwksUrl: env.FIREBASE_JWKS_URL, // hermetic-test override only
+      firebaseClient: env.FIREBASE_API_KEY ? {
+        apiKey: env.FIREBASE_API_KEY,
+        authDomain: env.FIREBASE_AUTH_DOMAIN || (env.FIREBASE_PROJECT_ID ? `${env.FIREBASE_PROJECT_ID}.firebaseapp.com` : undefined),
+        projectId: env.FIREBASE_PROJECT_ID,
+        appId: env.FIREBASE_APP_ID,
+      } : null,
       neonJwksUrl: env.NEON_AUTH_JWKS_URL,
       neonIssuer: env.NEON_AUTH_ISSUER,
       neonAudience: env.NEON_AUTH_AUDIENCE || undefined,
@@ -123,6 +131,7 @@ function getApi(env) {
       }),
       env: {
         GOOGLE_SIGNIN_ENABLED: 'false',
+        FIREBASE_SIGNIN_ENABLED: env.FIREBASE_SIGNIN_ENABLED === 'true' ? 'true' : 'false',
         NEON_AUTH_URL: env.NEON_AUTH_URL || '',
         // Synthetic preview demo entry. 'true' ONLY for this gated preview
         // deployment; absent/false everywhere else = the route does not exist.

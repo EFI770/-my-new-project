@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from './api.js';
+import { initFirebase } from './firebase.js';
 import { LangProvider, useLang } from './i18n.jsx';
 import Landing from './screens/Landing.jsx';
 import AuthScreen from './screens/Auth.jsx';
@@ -52,7 +53,19 @@ function Shell() {
   const refreshMe = useCallback(async () => {
     try { setMe(await api.me()); } catch { setMe(null); }
   }, []);
-  useEffect(() => { refreshMe(); }, [refreshMe]);
+  // Boot order: restore the vendor session (Firebase persists it in IndexedDB)
+  // BEFORE the first /api/me, or a returning signed-in user looks logged out.
+  const [authReady, setAuthReady] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const p = await api.providers();
+        if (p?.firebase?.enabled && p.firebase.config) await initFirebase(p.firebase.config);
+      } catch { /* vendor unreachable: email/dev entry still works */ }
+      setAuthReady(true);
+    })();
+  }, []);
+  useEffect(() => { if (authReady) refreshMe(); }, [authReady, refreshMe]);
 
   const showToast = useCallback((text) => {
     setToast(text);
@@ -71,7 +84,7 @@ function Shell() {
     prevTab.current = tab;
   }, [tab, me]);
 
-  if (me === undefined) {
+  if (me === undefined || !authReady) {
     return <div role="status" className="min-h-screen grid place-items-center text-ink-2">{t('loading')}</div>;
   }
 

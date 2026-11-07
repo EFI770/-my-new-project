@@ -17,6 +17,14 @@ const PORT = Number(process.env.PORT || 4173);
 
 const api = createApiHandler({
   authMode: process.env.CHAVRUTA_AUTH_MODE || 'dev',
+  firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
+  firebaseJwksUrl: process.env.FIREBASE_JWKS_URL, // hermetic-test override only
+  firebaseClient: process.env.FIREBASE_API_KEY ? {
+    apiKey: process.env.FIREBASE_API_KEY,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN || `${process.env.FIREBASE_PROJECT_ID}.firebaseapp.com`,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    appId: process.env.FIREBASE_APP_ID,
+  } : null,
   neonJwksUrl: process.env.NEON_AUTH_JWKS_URL,
   neonIssuer: process.env.NEON_AUTH_ISSUER,
   neonAudience: process.env.NEON_AUTH_AUDIENCE,

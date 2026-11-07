@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { signOutFirebase, deleteFirebaseUser } from '../firebase.js';
 import { errText, useLang, useLabels, TOPICS } from '../i18n.jsx';
 import { useApp } from '../App.jsx';
 
@@ -57,13 +58,19 @@ export default function Profile() {
 
   async function deleteAccount() {
     try {
+      // Order matters: server data goes first (the ID token is still valid),
+      // then the Firebase identity record is erased client-side. If the
+      // vendor erasure fails, local data is still gone and the session ends.
       await api.deleteAccount();
+      try { await deleteFirebaseUser(); } catch { /* vendor record erasure failed; local data deleted */ }
+      await signOutFirebase();
       await refreshMe();
     } catch (err) { showToast(errText(t, err)); }
   }
 
   async function logout() {
     await api.logout().catch(() => {});
+    await signOutFirebase();
     await refreshMe();
   }
 

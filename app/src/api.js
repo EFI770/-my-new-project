@@ -1,10 +1,15 @@
 // All server access goes through this module. It is the ONLY place that knows
 // the transport. When the auth/backend vendor is chosen, this module is
 // reimplemented over the vendor client; no screen changes.
+let tokenProvider = null; // vendor mode (Firebase): supplies the Bearer ID token
 async function call(method, path, body) {
+  const token = tokenProvider ? await tokenProvider() : null;
+  const headers = {};
+  if (token) headers.authorization = `Bearer ${token}`;
+  if (body !== undefined) headers['content-type'] = 'application/json';
   const res = await fetch(path, {
     method,
-    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   let data = null;
@@ -19,6 +24,7 @@ async function call(method, path, body) {
 }
 
 export const api = {
+  setTokenProvider: (fn) => { tokenProvider = fn; },
   providers: () => call('GET', '/api/auth/providers'),
   register: (b) => call('POST', '/api/auth/register', b),
   login: (b) => call('POST', '/api/auth/login', b),
