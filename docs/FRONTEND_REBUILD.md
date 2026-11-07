@@ -102,3 +102,32 @@ S2b, C3, I6, V8b/V8c.
 - אזורים: אין אזור Supabase בישראל/המזרח התיכון; האזור הספציפי הקרוב ביותר המתועד הוא
   Central EU (Frankfurt, eu-central-1). בחירת אזור היא גם בחירת מיקום נתונים.
   מקור: https://supabase.com/docs/guides/platform/regions
+
+## Real Firebase acceptance and fixture isolation, 2026-11-07
+
+Owner-performed Google sign-in and self-registration reached the candidate
+screen. Live DB verified exactly one vendor binding and matching self-declared
+profile. Two live schema omissions were corrected: missing deletion tombstone
+table, and Neon owner role membership lacking SET permission for atomic signup.
+Migration0008 grants only downward SET capability, no automatic inheritance.
+
+Migration0009 separates privately marked synthetic members from real members.
+The four known acceptance fixtures are marked in the acceptance DB, not deleted
+or relabeled as real. Existing real-to-fixture interest is retained but hidden.
+New accounts default to real. RLS isolates profiles, requests, interests and
+connections. Match/contact RPCs and connection mutation trigger also check
+population, including security-definer respond/consent paths. No token or real
+profile is needed to run the rollback-only population contract:
+
+`TEST_DATABASE_URL=... node server/harness/live-population-check.mjs`
+
+Live rollback checks passed: real-owner context sees only self and no fixtures;
+known fixture writes/contact rejected; synthetic pair preserved; new temporary
+A/B/C rows exercise same-gender visibility, private unilateral interest, mutual
+match, accepted request, bilateral consent, withdrawal, third-party rejection.
+All diagnostic rows and ties rolled back. These test DB policy boundaries, not
+independent real Google A/B sessions or real Firebase erasure/revocation.
+
+Public gate remains closed at this checkpoint. Operator/contact and deletion
+retention/reentry facts remain provisional. Do not count owner signup acceptance
+as proof of community capacity or vendor account deletion.
