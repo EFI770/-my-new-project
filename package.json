@@ -1,16 +1,1 @@
-{
-  "name": "chavruta-app",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "description": "Hebrew RTL Chavruta matching app prototype",
-  "scripts": {
-    "test": "node --test"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "wrangler": "^4.158.0"
-  }
-}
+{"name":"chavruta-compatibility-entry","private":true,"type":"module","scripts":{"test":"node --test"},"engines":{"node":">=18"}}
