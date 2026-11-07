@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { initFirebase, signInWithGoogle, signOutFirebase } from '../firebase.js';
+import { initFirebase, signInWithGoogle, signOutFirebase, deleteFirebaseUser, currentFirebaseUser } from '../firebase.js';
 import { errText, useLang, useLabels } from '../i18n.jsx';
 import { useApp, LangSwitch } from '../App.jsx';
 
@@ -24,7 +24,30 @@ export default function AuthScreen() {
   // variant (name/gender/18+ only, no email/password) and registers with the
   // verified ID token.
   const [googleUser, setGoogleUser] = useState(null);
+  // A persisted Firebase session without an app account (deleted account with
+  // failed record erasure, or sign-in abandoned before registration): offer
+  // finish-signup or explicit record removal with a retry + support route.
+  const [pendingVendor, setPendingVendor] = useState(null);
   useEffect(() => { api.providers().then(setProviders).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!providers?.firebase?.enabled || !providers.firebase.config) return;
+    initFirebase(providers.firebase.config)
+      .then(() => { const u = currentFirebaseUser(); if (u) setPendingVendor(u); })
+      .catch(() => {});
+  }, [providers]);
+
+  async function removeVendorRecord() {
+    setOauthBusy(true);
+    setError(null);
+    try {
+      await deleteFirebaseUser();
+      setPendingVendor(null);
+      showToast(t('toastSigninRecordRemoved'));
+    } catch {
+      setError(t('signinRecordRemoveFailed'));
+    }
+    setOauthBusy(false);
+  }
 
   async function googleSignIn() {
     setOauthBusy(true);
@@ -119,6 +142,7 @@ export default function AuthScreen() {
           showToast(t('toastWelcome'));
         }
         setGoogleUser(null);
+        setPendingVendor(null);
         await refreshMe();
         navigate('find');
         return;
@@ -276,6 +300,27 @@ export default function AuthScreen() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+      {pendingVendor && !googleUser && (
+        <div className="pt-4 space-y-2">
+          <p className="rounded-xl bg-cream-2 px-4 py-3 text-[12px] leading-5 text-ink-2">{t('vendorSessionNote')}</p>
+          <button
+            type="button"
+            onClick={() => { setGoogleUser(pendingVendor); setDisplayName(pendingVendor.displayName || ''); setMode('register'); }}
+            disabled={oauthBusy}
+            className="block w-full rounded-full bg-green-dark py-3 text-center text-[15px] font-semibold text-white disabled:opacity-60"
+          >
+            {t('finishSignup')}
+          </button>
+          <button
+            type="button"
+            onClick={removeVendorRecord}
+            disabled={oauthBusy}
+            className="block w-full rounded-full border border-[#e7e5e4] bg-white py-3 text-center text-[14px] font-semibold text-ink disabled:opacity-60"
+          >
+            {t('removeSigninRecord')}
+          </button>
         </div>
       )}
       {((providers?.firebase?.enabled && providers.firebase.config) || (providers?.google?.enabled && providers.google.authUrl)) && (

@@ -73,10 +73,25 @@ clear the tombstone row (pilot scale makes this practical). Fail-closed by
 default.
 
 Honest partial failure: if the client-side vendor erasure fails (network, or
-the user cancels the re-auth popup), app data is still gone and the session
-ends, and the UI tells the user the sign-in record may remain, with the manual
-removal path (Google Account > Security > connections). It is not a silent
-console log. Identity erasure at the vendor is NOT claimed verified.
+the user cancels the re-auth popup), app data is still gone, the Firebase
+session is KEPT, and the sign-in screen offers an explicit "remove sign-in
+record" retry plus the support route: the operator deletes the user in the
+Firebase console (Authentication > Users). The user is told all of this in a
+toast - it is not a silent console log. NOTE: revoking the app's access under
+Google Account > Security > connections is NOT Firebase identity deletion and
+is never presented as one. Identity erasure at the vendor is NOT claimed
+verified.
+
+RETENTION RECORD (PROVISIONAL - owner decision pending, 2026-11-07):
+- Retained identifier: the vendor subject string (Firebase uid) in
+  auth.deleted_subs. No profile data, no email, no tokens.
+- Purpose: prevent a deleted account's silent re-creation by its still-valid
+  vendor token (~1h Firebase ID-token lifetime) or a cached token.
+- Cleanup: no automatic expiry; the operator deletes the row to allow re-entry.
+- Open re-entry question for the owner: is operator-mediated re-entry the
+  intended policy, or should tombstones expire (e.g. after N days), or be
+  cleared on verified vendor deletion? Until the owner decides, the policy is
+  fail-closed (blocked re-register) and the identifier is retained.
 
 ## Owner console steps (one-time)
 

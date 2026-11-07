@@ -28,6 +28,10 @@ export async function initFirebase(config) {
   return auth;
 }
 
+export function currentFirebaseUser() {
+  return auth ? auth.currentUser : null;
+}
+
 export async function signInWithGoogle() {
   if (!auth) throw new Error('firebase_not_initialized');
   const cred = await mod.signInWithPopup(auth, new mod.GoogleAuthProvider());

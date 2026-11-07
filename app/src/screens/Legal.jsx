@@ -112,11 +112,11 @@ export function Privacy() {
       <Section
         he={<>
           <H>6. שמירת מידע ומחיקה</H>
-          <P>המידע נשמר כל עוד החשבון פעיל. ניתן למחוק את החשבון בכל עת מתוך האפליקציה (מסך הפרופיל). נכון ל-6 בנובמבר 2026 אומת בפועל שהמחיקה מסירה מיידית את פרופיל הלימוד, נתוני ההתאמה, פרטי הקשר ורשומת הזהות אצל ספק הזהויות. ייתכן שעותקים יישארו לזמן מה בגיבויים וביומני מערכת אצל ספק הענן, עד להחלפתם ומחיקתם לפי מדיניות הספק; טווח הזמן המדויק לכך טרם אומת.</P>
+          <P>המידע נשמר כל עוד החשבון פעיל. ניתן למחוק את החשבון בכל עת מתוך האפליקציה (מסך הפרופיל). המחיקה מסירה מיידית את פרופיל הלימוד, נתוני ההתאמה ופרטי הקשר. מחיקת רשומת הזהות אצל ספק הכניסה (Google דרך Firebase) מתבצעת כחלק מתהליך המחיקה באפליקציה; אם היא לא הושלמה, תוצע אפשרות לנסות שוב או לפנות למפעיל להסרה. לאחר מחיקה נשמר מזהה טכני בלבד של רשומת הכניסה (ללא פרופיל וללא אימייל) כדי למנוע פתיחה מחדש אוטומטית של חשבון שנמחק; המפעיל מוחק מזהה זה לפי בקשה. ייתכן שעותקים יישארו לזמן מה בגיבויים וביומני מערכת אצל ספק הענן, עד להחלפתם ומחיקתם לפי מדיניות הספק; טווח הזמן המדויק לכך טרם אומת.</P>
         </>}
         en={<>
           <H>6. Retention and deletion</H>
-          <P>Data is kept while your account is active. You can delete your account at any time from within the app (profile screen). As verified in practice on November 6, 2026, deletion immediately removes the learning profile, matching data, contact details, and the identity record at the identity provider. Copies may persist for a limited time in the cloud provider's backups and system logs until they roll over and are deleted per the provider's policy; the exact timeframe has not yet been verified.</P>
+          <P>Data is kept while your account is active. You can delete your account at any time from within the app (profile screen). Deletion immediately removes the learning profile, matching data, and contact details. Removing the identity record at the sign-in provider (Google via Firebase) runs as part of in-app deletion; if it does not complete, you can retry or ask the operator to remove it. After deletion we retain only a technical identifier of the sign-in record (no profile, no email) to prevent automatic re-creation of a deleted account; the operator removes this identifier on request. Copies may persist for a limited time in the cloud provider's backups and system logs until they roll over and are deleted per the provider's policy; the exact timeframe has not yet been verified.</P>
         </>}
       />
       <Section

@@ -66,7 +66,9 @@ export default function Profile() {
       await api.deleteAccount();
       let vendorErased = true;
       try { await deleteFirebaseUser(); } catch { vendorErased = false; }
-      await signOutFirebase();
+      // On erasure failure (incl. a cancelled re-auth popup) the Firebase
+      // session is KEPT, so the sign-in screen can offer an explicit retry.
+      if (vendorErased) await signOutFirebase();
       await refreshMe();
       if (!vendorErased) showToast(t('deletePartialVendor'));
     } catch (err) { showToast(errText(t, err)); }
