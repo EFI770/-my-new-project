@@ -33,6 +33,12 @@ try {
     const visible=await action.evaluate(el=>{const b=el.getBoundingClientRect(),nav=document.querySelector('nav').getBoundingClientRect();return b.top>=0 && b.bottom<=nav.top;});
     if(!visible)throw new Error('Card action blocked by fixed nav '+name);
     await page.screenshot({path:`/downloads/chavruta-warm-${name}-action.png`,fullPage:false});
+    await page.setViewport({width,height:480});
+    await action.evaluate(el=>el.scrollIntoView({block:'center'}));await action.focus();
+    const shortVisible=await action.evaluate(el=>{const b=el.getBoundingClientRect(),n=document.querySelector('nav').getBoundingClientRect();return b.top>=0&&b.bottom<=n.top;});
+    if(!shortVisible)throw new Error('Action unreachable in reduced-height viewport '+name);
+    console.log('reduced-height focus visible',name);
+    await page.setViewport({width,height:900});
   }
  }
  member=false;lang='he';await page.setViewport({width:390,height:900});
