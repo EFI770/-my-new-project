@@ -131,3 +131,24 @@ independent real Google A/B sessions or real Firebase erasure/revocation.
 Public gate remains closed at this checkpoint. Operator/contact and deletion
 retention/reentry facts remain provisional. Do not count owner signup acceptance
 as proof of community capacity or vendor account deletion.
+
+## Optional study time preferences, 2026-11-07
+
+Requested by owner21:28:35. Signup/profile and study-request create/edit now store
+up to four exact wall-clock windows and one preferred duration15/30/45/60/90/120
+minutes. Empty is unspecified, never all-day availability. Existing members keep
+empty windows and null duration. All displayed windows explicitly use Israel
+(Asia/Jerusalem) time; chosen days indicate the window's starting day. An end
+before its start runs into the next day. Same windows apply to selected weekdays;
+this version does not express different hours per weekday or book any meeting.
+
+Cards and matches display these preferences. Eligibility and ranking are NOT
+changed, so a user's unspecified hours never silently excludes them. No overlap
+or schedule-match claim is made. Requests persist/edit their own windows rather
+than silently copying later profile changes. RLS audience remains unchanged.
+
+Root47, Firebase API/localDB39, UI320px profile save/reload and candidate/signup
+render checks passed. HE/EN mobile pixels inspected; fixed preexisting weekday
+row wrap in profile/requests at320px. Native time-input platform rendering can
+vary on physical iOS, no physical-keyboard check claimed. Live additive schema
+migration preserved all5 profiles and left hours/duration unspecified.

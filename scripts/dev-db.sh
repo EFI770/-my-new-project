@@ -28,7 +28,7 @@ $f$;
 grant usage on schema public to anon, authenticated;
 grant usage on schema auth to anon, authenticated;
 SQL
-for f in supabase/migrations/0001_initial_schema.sql supabase/migrations/0002_contact_consent_and_blocks.sql supabase/migrations/0003_private_interests_and_contact_disclosure.sql supabase/migrations/0004_gender_separation.sql supabase/migrations/0005_neon_vendor_bootstrap.sql supabase/migrations/0006_age_attestation.sql supabase/migrations/0007_vendor_deletion_tombstones.sql; do
+for f in supabase/migrations/0001_initial_schema.sql supabase/migrations/0002_contact_consent_and_blocks.sql supabase/migrations/0003_private_interests_and_contact_disclosure.sql supabase/migrations/0004_gender_separation.sql supabase/migrations/0005_neon_vendor_bootstrap.sql supabase/migrations/0006_age_attestation.sql supabase/migrations/0007_vendor_deletion_tombstones.sql supabase/migrations/0010_study_availability.sql; do
   # 0005 needs the runtime-role password injected (never stored in the repo);
   # this local-only default is for the throwaway dev database.
   psql -h "$SOCK" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -v chavruta_app_password="${CHAVRUTA_APP_PASSWORD:-dev-only-local-password}" -q -f "$f"

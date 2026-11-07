@@ -1,3 +1,5 @@
+import {AvailabilityFields, AvailabilitySummary} from '../StudyAvailability.jsx';
+import {cleanStudyAvailability} from '../availability.js';
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { initFirebase, signInWithGoogle, signOutFirebase, deleteFirebaseUser, currentFirebaseUser } from '../firebase.js';
@@ -13,6 +15,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [gender, setGender] = useState('');
+  const [availability,setAvailability]=useState({availableDays:[],availableWindows:[],studyDurationMinutes:null});
   const [attestAdult, setAttestAdult] = useState(false);
   const [error, setError] = useState(null);
   // Google sign-in for app users (owner decision): rendered only when the
@@ -157,13 +160,14 @@ export default function AuthScreen() {
       setError(t('ageAttestRequired'));
       return;
     }
+    if(mode==='register'&&!cleanStudyAvailability(availability)){setError(t('err_invalid_availability'));return;}
     setBusy(true);
     try {
       if (googleUser) {
         // Vendor registration: the Bearer ID token is attached by the token
         // provider; the server binds the verified subject. No password.
         try {
-          await api.register({ displayName, gender, attestAdult });
+          await api.register({ displayName, gender, attestAdult, ...availability });
           showToast(t('toastRegistered'));
         } catch (err) {
           // Already registered on the server (e.g. earlier attempt): just enter.
@@ -177,7 +181,7 @@ export default function AuthScreen() {
         return;
       }
       if (mode === 'register') {
-        await api.register({ email, password, displayName, gender, attestAdult });
+        await api.register({ email, password, displayName, gender, attestAdult, ...availability });
         showToast(t('toastRegistered'));
       } else {
         await api.login({ email, password });
@@ -259,6 +263,7 @@ export default function AuthScreen() {
               </div>
               <div className="pt-1.5 text-[11px] leading-5 text-ink-2">{t('genderNote')}</div>
             </div>
+            <AvailabilityFields value={availability} onChange={setAvailability} includeDays/>
             <label className="flex items-start gap-2.5">
               <input
                 type="checkbox"

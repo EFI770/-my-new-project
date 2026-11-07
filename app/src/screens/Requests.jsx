@@ -1,9 +1,11 @@
+import {AvailabilityFields, AvailabilitySummary} from '../StudyAvailability.jsx';
+import {cleanStudyAvailability} from '../availability.js';
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { errText, useLang, useLabels, TOPICS } from '../i18n.jsx';
 import { useApp } from '../App.jsx';
 
-const EMPTY_FORM = { title: '', topic: '', description: '', learningLevel: '', preferredModes: [], availableDays: [] };
+const EMPTY_FORM = { title: '', topic: '', description: '', learningLevel: '', preferredModes: [], availableDays: [],availableWindows:[],studyDurationMinutes:null };
 
 export default function Requests() {
   const { showToast, navigate } = useApp();
@@ -26,14 +28,15 @@ export default function Requests() {
 
   async function save() {
     try {
+      if(!cleanStudyAvailability(form))throw {code:'invalid_availability'};
       if (form.id) {
-        await api.updateStudyRequest(form.id, { title: form.title, description: form.description, topic: form.topic });
+        await api.updateStudyRequest(form.id, { title: form.title, description: form.description, topic: form.topic,availableDays:form.availableDays,availableWindows:form.availableWindows,studyDurationMinutes:form.studyDurationMinutes });
         showToast(t('toastReqUpdated'));
       } else {
         await api.createStudyRequest({
           title: form.title, topic: form.topic, description: form.description,
           learningLevel: form.learningLevel || null,
-          preferredModes: form.preferredModes, availableDays: form.availableDays,
+          preferredModes: form.preferredModes, availableDays: form.availableDays,availableWindows:form.availableWindows,studyDurationMinutes:form.studyDurationMinutes,
         });
         showToast(t('toastReqPublished'));
       }
@@ -83,7 +86,7 @@ export default function Requests() {
           </label>
           <div>
             <span className="text-[13px] font-medium">{t('reqLevel')}</span>
-            <div className="flex gap-1.5 pt-1.5">
+            <div className="flex flex-wrap gap-1.5 pt-1.5">
               {['beginner', 'intermediate', 'advanced'].map((k) => (
                 <button key={k} type="button" onClick={() => setForm({ ...form, learningLevel: k })}
                   className={`rounded-full border px-3.5 py-1.5 text-[13px] ${form.learningLevel === k ? 'border-green-dark bg-green-dark text-white' : 'border-[#e7e5e4] bg-white'}`}>{labels.level(k)}</button>
@@ -92,7 +95,7 @@ export default function Requests() {
           </div>
           <div>
             <span className="text-[13px] font-medium">{t('reqModes')}</span>
-            <div className="flex gap-1.5 pt-1.5">
+            <div className="flex flex-wrap gap-1.5 pt-1.5">
               {['in_person', 'phone', 'video'].map((k) => (
                 <button key={k} type="button" onClick={() => setForm({ ...form, preferredModes: toggle(form.preferredModes, k) })}
                   className={`rounded-full border px-3.5 py-1.5 text-[13px] ${form.preferredModes.includes(k) ? 'border-green-dark bg-green-dark text-white' : 'border-[#e7e5e4] bg-white'}`}>{labels.mode(k)}</button>
@@ -101,13 +104,14 @@ export default function Requests() {
           </div>
           <div>
             <span className="text-[13px] font-medium">{t('reqDays')}</span>
-            <div className="flex gap-1.5 pt-1.5">
+            <div className="flex flex-wrap gap-1.5 pt-1.5">
               {['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((k) => (
                 <button key={k} type="button" onClick={() => setForm({ ...form, availableDays: toggle(form.availableDays, k) })}
                   className={`rounded-full border px-3 py-1.5 text-[13px] ${form.availableDays.includes(k) ? 'border-green-dark bg-green-dark text-white' : 'border-[#e7e5e4] bg-white'}`}>{labels.day(k)}</button>
               ))}
             </div>
           </div>
+          <AvailabilityFields value={form} onChange={setForm}/>
           <button onClick={save} disabled={!form.title.trim() || !form.topic}
             className="w-full rounded-full bg-green-dark py-3 text-[15px] font-semibold text-white disabled:opacity-50">
             {form.id ? t('save') : t('publish')}
@@ -140,9 +144,10 @@ export default function Requests() {
               {(s.preferredModes || []).length > 0 && <span>{s.preferredModes.map((m) => labels.mode(m)).join(' • ')}</span>}
               {(s.availableDays || []).length > 0 && <span>{t('daysPrefix')} {s.availableDays.map((d) => labels.day(d)).join(' ')}</span>}
             </div>
+            <AvailabilitySummary windows={s.availableWindows} duration={s.studyDurationMinutes}/>
             {s.mine ? (
               <div className="flex gap-2 pt-4">
-                <button onClick={() => setForm({ ...EMPTY_FORM, id: s.id, title: s.title, topic: s.topic, description: s.description, learningLevel: s.learningLevel || '', preferredModes: s.preferredModes || [], availableDays: s.availableDays || [] })}
+                <button onClick={() => setForm({ ...EMPTY_FORM, id: s.id, title: s.title, topic: s.topic, description: s.description, learningLevel: s.learningLevel || '', preferredModes: s.preferredModes || [], availableDays: s.availableDays || [],availableWindows:s.availableWindows||[],studyDurationMinutes:s.studyDurationMinutes??null })}
                   className="flex-1 rounded-full border border-[#e7e5e4] bg-white py-2 text-[13px]">{t('edit')}</button>
                 {s.status === 'open'
                   ? <button onClick={() => setStatus(s.id, 'paused')} className="flex-1 rounded-full border border-[#e7e5e4] bg-white py-2 text-[13px]">{t('pause')}</button>

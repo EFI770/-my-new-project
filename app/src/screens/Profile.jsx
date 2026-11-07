@@ -1,3 +1,5 @@
+import {AvailabilityFields, AvailabilitySummary} from '../StudyAvailability.jsx';
+import {cleanStudyAvailability} from '../availability.js';
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { signOutFirebase, deleteFirebaseUser } from '../firebase.js';
@@ -13,7 +15,7 @@ export default function Profile() {
     displayName: p.display_name || '', bio: p.bio || '',
     learningTopics: p.learning_topics || [], learningLevel: p.learning_level || '',
     preferredModes: p.preferred_modes || [], availableDays: p.available_days || [],
-    availabilityNotes: p.availability_notes || '',
+    availabilityNotes: p.availability_notes || '', availableWindows:p.available_windows||[],studyDurationMinutes:p.study_duration_minutes??null,
   });
   const [methods, setMethods] = useState(me.contactMethods || []);
   const [blocks, setBlocks] = useState(null);
@@ -25,10 +27,11 @@ export default function Profile() {
 
   async function saveProfile() {
     try {
+      if(!cleanStudyAvailability(form))throw {code:'invalid_availability'};
       await api.updateProfile({
         displayName: form.displayName, bio: form.bio, learningTopics: form.learningTopics,
         learningLevel: form.learningLevel || null, preferredModes: form.preferredModes,
-        availableDays: form.availableDays, availabilityNotes: form.availabilityNotes,
+        availableDays: form.availableDays, availabilityNotes: form.availabilityNotes, availableWindows:form.availableWindows,studyDurationMinutes:form.studyDurationMinutes,
       });
       await refreshMe();
       showToast(t('toastProfileSaved'));
@@ -113,7 +116,7 @@ export default function Profile() {
           </div>
           <div>
             <span className="text-[13px] font-medium">{t('reqLevel')}</span>
-            <div className="flex gap-1.5 pt-1.5">
+            <div className="flex flex-wrap gap-1.5 pt-1.5">
               {['beginner', 'intermediate', 'advanced'].map((k) => (
                 <button key={k} type="button" onClick={() => setForm({ ...form, learningLevel: form.learningLevel === k ? '' : k })}
                   className={`rounded-full border px-3.5 py-1.5 text-[13px] ${form.learningLevel === k ? 'border-green-dark bg-green-dark text-white' : 'border-[#e7e5e4] bg-white'}`}>{labels.level(k)}</button>
@@ -122,7 +125,7 @@ export default function Profile() {
           </div>
           <div>
             <span className="text-[13px] font-medium">{t('reqModes')}</span>
-            <div className="flex gap-1.5 pt-1.5">
+            <div className="flex flex-wrap gap-1.5 pt-1.5">
               {['in_person', 'phone', 'video'].map((k) => (
                 <button key={k} type="button" onClick={() => setForm({ ...form, preferredModes: toggle(form.preferredModes, k) })}
                   className={`rounded-full border px-3.5 py-1.5 text-[13px] ${form.preferredModes.includes(k) ? 'border-green-dark bg-green-dark text-white' : 'border-[#e7e5e4] bg-white'}`}>{labels.mode(k)}</button>
@@ -131,13 +134,14 @@ export default function Profile() {
           </div>
           <div>
             <span className="text-[13px] font-medium">{t('freeDays')}</span>
-            <div className="flex gap-1.5 pt-1.5">
+            <div className="flex flex-wrap gap-1.5 pt-1.5">
               {['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((k) => (
                 <button key={k} type="button" onClick={() => setForm({ ...form, availableDays: toggle(form.availableDays, k) })}
                   className={`rounded-full border px-3 py-1.5 text-[13px] ${form.availableDays.includes(k) ? 'border-green-dark bg-green-dark text-white' : 'border-[#e7e5e4] bg-white'}`}>{labels.day(k)}</button>
               ))}
             </div>
           </div>
+          <AvailabilityFields value={form} onChange={setForm}/>
           <button onClick={saveProfile} disabled={!form.displayName.trim()}
             className="w-full rounded-full bg-green-dark py-3 text-[15px] font-semibold text-white disabled:opacity-50">
             {t('saveProfile')}

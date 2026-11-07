@@ -220,6 +220,19 @@ try {
 const signupRetry=await api('POST','/api/auth/register',{localAddress:'127.0.0.22',jwt:E.jwt,body:{displayName:'retry',gender:'man',attestAdult:true}});
 const complete=await sql.query('select p.id from public.profiles p join auth.users u on p.id=u.id where u.auth_sub=$1',[E.sub]);
 ok('F21b signup retry succeeds with complete profile',signupRetry.status===201 && complete.rowCount===1);
+// Optional availability must persist through signup, profile edit, cards and requests.
+const T={sub:`uid-times-${RUN}`};T.jwt=await mintToken(T);
+const timePrefs={availableDays:['sun','wed'],availableWindows:[{start:'20:00',end:'21:00'}],studyDurationMinutes:30};
+let tr=await api('POST','/api/auth/register',{localAddress:'127.0.0.40',jwt:T.jwt,body:{displayName:'time preferences test',gender:'man',attestAdult:true,...timePrefs}});
+ok('T1 signup persists optional times',tr.status===201);
+tr=await api('GET','/api/me',{jwt:T.jwt});ok('T2 me returns exact windows and duration',tr.data?.profile?.available_windows?.[0]?.start==='20:00'&&tr.data?.profile?.available_windows?.[0]?.end==='21:00'&&tr.data?.profile?.study_duration_minutes===30);
+tr=await api('PUT','/api/me/profile',{jwt:T.jwt,body:{displayName:'time preferences test',bio:'',availabilityNotes:'',availableDays:['thu'],availableWindows:[{start:'23:30',end:'00:30'}],studyDurationMinutes:60}});ok('T3 profile edits times and duration',tr.status===200);
+tr=await api('GET','/api/candidates',{jwt:C.jwt});const tc=tr.data?.candidates?.find(x=>x.displayName==='time preferences test');ok('T4 candidate card returns edited overnight window and duration',tc?.availableWindows?.[0]?.start==='23:30'&&tc?.studyDurationMinutes===60);
+tr=await api('POST','/api/study-requests',{jwt:T.jwt,body:{title:'availability test',topic:'משנה',...timePrefs}});const reqId=tr.data?.id;ok('T5 request create with times',tr.status===201);
+tr=await api('PUT',`/api/study-requests/${reqId}`,{jwt:T.jwt,body:{availableDays:['mon'],availableWindows:[{start:'10:00',end:'11:00'}],studyDurationMinutes:60}});ok('T6 request edit times',tr.status===200);
+tr=await api('GET','/api/study-requests',{jwt:T.jwt});const ts=tr.data?.studyRequests?.find(x=>x.id===reqId);ok('T7 request times persist after reload',ts?.availableWindows?.[0]?.start==='10:00'&&ts?.studyDurationMinutes===60&&ts?.availableDays?.[0]==='mon');
+tr=await api('PUT','/api/me/profile',{jwt:T.jwt,body:{displayName:'time preferences test',bio:'',availableWindows:[{start:'08:00',end:'08:00'}]}});ok('T8 invalid availability rejected before mutation',tr.status===400&&tr.data?.error==='invalid_availability');
+const unchanged=await sql.query('select study_duration_minutes from public.profiles p join auth.users u on p.id=u.id where auth_sub=$1',[T.sub]);ok('T9 invalid update preserves existing data',unchanged.rows[0]?.study_duration_minutes===60);
 await sql.end();
 
 await new Promise((r) => jwksServer.close(r));

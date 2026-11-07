@@ -1,3 +1,5 @@
+import {AvailabilityFields, AvailabilitySummary} from '../StudyAvailability.jsx';
+import {cleanStudyAvailability} from '../availability.js';
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { errText, useLang, useLabels, TOPICS } from '../i18n.jsx';
@@ -119,6 +121,7 @@ export default function Candidates() {
                   {(c.preferredModes || []).length > 0 && <span>{c.preferredModes.map((m) => labels.mode(m)).join(' • ')}</span>}
                   {(c.availableDays || []).length > 0 && <span>{t('daysPrefix')} {c.availableDays.map((d) => labels.day(d)).join(' ')}</span>}
                 </div>
+                <AvailabilitySummary windows={c.availableWindows} duration={c.studyDurationMinutes}/>
                 <button
                   onClick={() => toggleInterest(c)}
                   className={`mt-4 w-full rounded-full py-2.5 text-[14px] font-medium ${

@@ -4,6 +4,7 @@
 // `authenticated`, app.sub per request). This file routes and validates input
 // shape only; it contains no authorization decisions of its own.
 import { mapPgError } from './db.js';
+import { cleanStudyAvailability } from '../app/src/availability.js';
 import { hashPassword, verifyPassword, newSessionToken, sessionExpiry } from './devAuth.js';
 import { createNeonAuth } from './neonAuth.js';
 import { createFirebaseAuth } from './firebaseAuth.js';
@@ -238,6 +239,9 @@ route('POST', '/api/auth/register', async (req, res) => {
     let payload;
     try { payload = await vendorAuth.verify(token); } catch { return send(res, 401, { error: 'authentication_required' }); }
     const body = await readBody(req);
+    const availability=cleanStudyAvailability(body);
+    const signupDays=cleanArray(body.availableDays,DAYS);
+    if(!availability||signupDays===null)return send(res,400,{error:'invalid_availability'});
     const displayName = cleanStr(body.displayName, 80);
     const gender = GENDERS.has(body.gender) ? body.gender : null;
     if (!displayName) return send(res, 400, { error: 'invalid_display_name' });
@@ -261,7 +265,7 @@ route('POST', '/api/auth/register', async (req, res) => {
       await c.query('set local role authenticated');
       await c.query(`select set_config('app.sub', $1, true)`, [id]);
       await c.query(
-        'insert into public.profiles (id, display_name, gender, age_attested_at) values ($1, $2, $3, now())', [id, displayName, gender]);
+        'insert into public.profiles (id, display_name, gender, age_attested_at,available_days,available_windows,study_duration_minutes) values ($1, $2, $3, now(),$4,$5::jsonb,$6)', [id, displayName, gender,signupDays,JSON.stringify(availability.windows),availability.duration]);
       return id;
     });
     if (created === 'tombstoned') return send(res, 403, { error: 'account_deleted' });
@@ -269,6 +273,9 @@ route('POST', '/api/auth/register', async (req, res) => {
     return send(res, 201, { userId: created });
   }
   const body = await readBody(req);
+  const availability=cleanStudyAvailability(body);
+  const signupDays=cleanArray(body.availableDays,DAYS);
+  if(!availability||signupDays===null)return send(res,400,{error:'invalid_availability'});
   const email = cleanStr(body.email, 254)?.toLowerCase();
   const password = typeof body.password === 'string' ? body.password : null;
   const displayName = cleanStr(body.displayName, 80);
@@ -296,7 +303,7 @@ route('POST', '/api/auth/register', async (req, res) => {
   if (!created) return send(res, 409, { error: 'email_taken' });
 
   await db.withRls(created, (c) => c.query(
-    'insert into public.profiles (id, display_name, gender, age_attested_at) values ($1, $2, $3, now())', [created, displayName, gender]));
+    'insert into public.profiles (id, display_name, gender, age_attested_at,available_days,available_windows,study_duration_minutes) values ($1, $2, $3, now(),$4,$5::jsonb,$6)', [created, displayName, gender,signupDays,JSON.stringify(availability.windows),availability.duration]));
 
   const token = newSessionToken();
   await db.asService((c) => c.query(
@@ -435,7 +442,7 @@ route('POST', '/api/me/attest-age', async (req, res, user) => {
 route('GET', '/api/me', async (req, res, user) => {
   const data = await db.withRls(user.id, async (c) => {
     const p = await c.query(
-      `select display_name, gender, bio, learning_topics, learning_level, preferred_modes, available_days, availability_notes, age_attested_at
+      `select display_name, gender, bio, learning_topics, learning_level, preferred_modes, available_days, availability_notes, age_attested_at,available_windows,study_duration_minutes
          from public.profiles where id = $1`, [user.id]);
     const m = await c.query(
       'select id, kind, value, is_primary from public.contact_methods where user_id = $1 order by is_primary desc, created_at',
@@ -447,6 +454,8 @@ route('GET', '/api/me', async (req, res, user) => {
 
 route('PUT', '/api/me/profile', async (req, res, user) => {
   const body = await readBody(req);
+  const availability=cleanStudyAvailability(body);
+  if(!availability)return send(res,400,{error:'invalid_availability'});
   const displayName = cleanStr(body.displayName, 80);
   const bio = typeof body.bio === 'string' && body.bio.length <= 1000 ? body.bio : null;
   const topics = cleanArray(body.learningTopics, null, 12);
@@ -470,8 +479,8 @@ route('PUT', '/api/me/profile', async (req, res, user) => {
     }
     await c.query(
       `update public.profiles set display_name=$2, bio=$3, learning_topics=$4, learning_level=$5,
-         preferred_modes=$6, available_days=$7, availability_notes=$8, updated_at=now() where id=$1`,
-      [user.id, displayName, bio, topics, level, modes, days, notes]);
+         preferred_modes=$6, available_days=$7, availability_notes=$8, available_windows=coalesce($9::jsonb,available_windows), study_duration_minutes=case when $10::boolean then $11::integer else study_duration_minutes end, updated_at=now() where id=$1`,
+      [user.id, displayName, bio, topics, level, modes, days, notes,body.availableWindows===undefined?null:JSON.stringify(availability.windows),body.studyDurationMinutes!==undefined,availability.duration]);
     if (body.gender !== undefined) {
       await c.query('update public.profiles set gender=$2, updated_at=now() where id=$1 and gender is null', [user.id, body.gender]);
     }
@@ -549,7 +558,7 @@ route('GET', '/api/candidates', async (req, res, user) => {
     // the viewer's interest is joined in instead of a second query (Workers
     // CPU budget - every round trip through the pool costs).
     const profiles = await c.query(
-      `select p.id, p.display_name, p.bio, p.learning_topics, p.learning_level, p.preferred_modes, p.available_days,
+      `select p.id, p.display_name, p.bio, p.learning_topics, p.learning_level, p.preferred_modes, p.available_days,p.available_windows,p.study_duration_minutes,
               s.interested as my_interest
          from public.profiles p
          left join public.interest_selections s
@@ -562,7 +571,7 @@ route('GET', '/api/candidates', async (req, res, user) => {
       learningTopics: p.learning_topics,
       learningLevel: p.learning_level,
       preferredModes: p.preferred_modes,
-      availableDays: p.available_days,
+      availableDays: p.available_days, availableWindows:p.available_windows,studyDurationMinutes:p.study_duration_minutes,
       myInterest: p.my_interest ?? null,
     }));
   });
@@ -587,7 +596,7 @@ route('GET', '/api/matches', async (req, res, user) => {
     // both the function's filters and the profiles read).
     const matches = await c.query(
       `select m.candidate_id, m.matched_at,
-              p.display_name, p.bio, p.learning_topics, p.learning_level, p.preferred_modes, p.available_days
+              p.display_name, p.bio, p.learning_topics, p.learning_level, p.preferred_modes, p.available_days,p.available_windows,p.study_duration_minutes
          from public.list_my_matches() m
          left join public.profiles p on p.id = m.candidate_id`);
     return matches.rows.map((m) => ({
@@ -595,7 +604,7 @@ route('GET', '/api/matches', async (req, res, user) => {
       matchedAt: m.matched_at,
       card: m.display_name != null ? {
         displayName: m.display_name, bio: m.bio, learningTopics: m.learning_topics,
-        learningLevel: m.learning_level, preferredModes: m.preferred_modes, availableDays: m.available_days,
+        learningLevel: m.learning_level, preferredModes: m.preferred_modes, availableDays: m.available_days,availableWindows:m.available_windows,studyDurationMinutes:m.study_duration_minutes,
       } : null,
     }));
   });
@@ -607,7 +616,7 @@ route('GET', '/api/study-requests', async (req, res, user) => {
   const rows = await db.withRls(user.id, async (c) => {
     const r = await c.query(
       `select sr.id, sr.owner_id, sr.title, sr.description, sr.topic, sr.learning_level,
-              sr.preferred_modes, sr.available_days, sr.status, sr.created_at,
+              sr.preferred_modes, sr.available_days,sr.available_windows,sr.study_duration_minutes, sr.status, sr.created_at,
               p.display_name as owner_name
          from public.study_requests sr
          left join public.profiles p on p.id = sr.owner_id
@@ -619,13 +628,15 @@ route('GET', '/api/study-requests', async (req, res, user) => {
       id: r.id, ownerId: r.owner_id, ownerName: r.owner_name, title: r.title,
       description: r.description, topic: r.topic, learningLevel: r.learning_level,
       preferredModes: r.preferred_modes, availableDays: r.available_days,
-      status: r.status, createdAt: r.created_at, mine: r.owner_id === user.id,
+      availableWindows:r.available_windows,studyDurationMinutes:r.study_duration_minutes, status: r.status, createdAt: r.created_at, mine: r.owner_id === user.id,
     })),
   });
 });
 
 route('POST', '/api/study-requests', async (req, res, user) => {
   const body = await readBody(req);
+  const availability=cleanStudyAvailability(body);
+  if(!availability)return send(res,400,{error:'invalid_availability'});
   const title = cleanStr(body.title, 120);
   const topic = cleanStr(body.topic, 120);
   const description = typeof body.description === 'string' && body.description.length <= 2000 ? body.description : '';
@@ -636,15 +647,20 @@ route('POST', '/api/study-requests', async (req, res, user) => {
     return send(res, 400, { error: 'invalid_input' });
   }
   const { rows } = await db.withRls(user.id, async (c) => c.query(
-    `insert into public.study_requests (owner_id, title, description, topic, learning_level, preferred_modes, available_days)
-       values ($1, $2, $3, $4, $5, $6, $7) returning id`,
-    [user.id, title, description, topic, level, modes, days]));
+    `insert into public.study_requests (owner_id, title, description, topic, learning_level, preferred_modes, available_days,available_windows,study_duration_minutes)
+       values ($1, $2, $3, $4, $5, $6, $7,$8::jsonb,$9) returning id`,
+    [user.id, title, description, topic, level, modes, days,JSON.stringify(availability.windows),availability.duration]));
   send(res, 201, { id: rows[0].id });
 });
 
 route('PUT', '/api/study-requests/:id', async (req, res, user, params) => {
   const body = await readBody(req);
   const patch = {};
+  const availability=cleanStudyAvailability(body);
+  if(!availability)return send(res,400,{error:'invalid_availability'});
+  if(body.availableWindows!==undefined)patch.available_windows=JSON.stringify(availability.windows);
+  if(body.studyDurationMinutes!==undefined)patch.study_duration_minutes=availability.duration;
+  if(body.availableDays!==undefined){const d=cleanArray(body.availableDays,DAYS);if(d===null)return send(res,400,{error:'invalid_availability'});patch.available_days=d;}
   if (body.title !== undefined) { const v = cleanStr(body.title, 120); if (!v) return send(res, 400, { error: 'invalid_input' }); patch.title = v; }
   if (body.description !== undefined) { if (typeof body.description !== 'string' || body.description.length > 2000) return send(res, 400, { error: 'invalid_input' }); patch.description = body.description; }
   if (body.topic !== undefined) { const v = cleanStr(body.topic, 120); if (!v) return send(res, 400, { error: 'invalid_input' }); patch.topic = v; }

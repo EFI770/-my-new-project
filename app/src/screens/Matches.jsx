@@ -1,3 +1,5 @@
+import {AvailabilityFields, AvailabilitySummary} from '../StudyAvailability.jsx';
+import {cleanStudyAvailability} from '../availability.js';
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { errText, useLang, useLabels } from '../i18n.jsx';
@@ -52,6 +54,7 @@ export default function Matches() {
             {(m.card?.preferredModes || []).length > 0 && <span>{m.card.preferredModes.map((x) => labels.mode(x)).join(' • ')}</span>}
             {(m.card?.availableDays || []).length > 0 && <span>{t('daysPrefix')} {m.card.availableDays.map((d) => labels.day(d)).join(' ')}</span>}
           </div>
+          <AvailabilitySummary windows={m.card?.availableWindows} duration={m.card?.studyDurationMinutes}/>
           {messageFor === m.candidateId ? (
             <div className="pt-3">
               <textarea
