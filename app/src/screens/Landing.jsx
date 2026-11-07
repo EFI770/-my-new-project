@@ -23,9 +23,9 @@ export default function Landing() {
         </div>
       </header>
 
-      <section className="pt-14 text-center">
+      <section className="landing-hero mt-7 px-5 py-10 text-center">
         <div className="text-[13px] text-ink-2">{t('landingKicker')}</div>
-        <h1 className="pt-3 text-[36px] font-bold leading-[0.95] tracking-tight text-green-dark md:text-[52px]">
+        <h1 className="pt-3 text-[36px] font-bold leading-[1.12] tracking-tight text-green-dark md:text-[52px]">
           {t('landingHero1')}
           <br />
           {t('landingHero2')}
@@ -49,7 +49,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="grid gap-4 pt-14 md:grid-cols-3">
+      <section className="grid gap-4 pt-7 md:grid-cols-3">
         {[
           [t('feat1Title'), t('feat1Body')],
           [t('feat2Title'), t('feat2Body')],

@@ -42,6 +42,7 @@ function Shell() {
   const [me, setMe] = useState(undefined); // undefined=loading, null=logged out
   const [toast, setToast] = useState(null);
   const { t } = useLang();
+  const [isDemo, setIsDemo] = useState(false);
 
   const TABS = [
     { key: 'find', label: t('tabFind') },
@@ -60,6 +61,7 @@ function Shell() {
     (async () => {
       try {
         const p = await api.providers();
+        setIsDemo(p?.demo?.enabled === true);
         if (p?.firebase?.enabled && p.firebase.config) await initFirebase(p.firebase.config);
       } catch { /* vendor unreachable: email/dev entry still works */ }
       setAuthReady(true);
@@ -101,9 +103,10 @@ function Shell() {
 
   return (
     <AppCtx.Provider value={ctx}>
-      <div className="mx-auto min-h-screen max-w-[920px] pb-24">
+      <div className="community-shell mx-auto min-h-screen max-w-[1120px] pb-24">
+        {isDemo && <div className="demo-ribbon">{t('designDemo')}</div>}
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-lg focus:bg-green-dark focus:px-4 focus:py-2 focus:text-white">{t('skipToContent')}</a>
-        <header className="flex items-center justify-between px-5 pt-5">
+        <header className="community-header flex items-center justify-between px-5 py-5">
           <div>
             <div className="text-[20px] font-bold text-green-dark">{t('brand')}</div>
             <div className="text-[12px] text-ink-2">{t('tagline')}</div>
@@ -122,7 +125,7 @@ function Shell() {
           {tab === 'me' && <Profile />}
         </main>
         <nav aria-label={t('navLabel')} className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e7e5e4] bg-white/90 backdrop-blur">
-          <div className="mx-auto grid max-w-[920px] grid-cols-4">
+          <div className="mx-auto grid max-w-[1120px] grid-cols-4">
             {TABS.map((tb) => (
               <button
                 key={tb.key}

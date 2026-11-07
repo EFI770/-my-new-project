@@ -175,17 +175,17 @@ export default function AuthScreen() {
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-[380px] px-5">
+    <div className="auth-entry mx-auto min-h-screen max-w-[480px] px-5">
       <header className="pt-5">
         <div className="flex items-center justify-between">
           <button onClick={() => navigate('')} className="text-[13px] text-ink-2">{t('back')}</button>
           <LangSwitch />
         </div>
-        <div className="pt-4 text-[20px] font-bold text-green-dark">{t('brand')}</div>
+        <div className="auth-brand pt-4 text-[30px] font-bold text-green-dark">{t('brand')}</div>
         <div className="text-[13px] text-ink-2">{t('authSubtitle')}</div>
       </header>
 
-      <div className="pt-5 text-[12px] leading-6 text-ink-2">
+      <div className="auth-privacy pt-5 text-[13px] leading-6 text-ink-2">
         {t('authPrivacy')}
       </div>
 
@@ -298,7 +298,7 @@ export default function AuthScreen() {
         <p className="rounded-xl bg-cream-2 px-4 py-3 text-center text-[12px] leading-5 text-ink-2">{t('demoOnlyNote')}</p>
       )}
       {providers?.demo?.enabled && (
-        <div className="pt-4 space-y-2">
+        <div className="auth-actions pt-4 space-y-2">
           <p className="text-center text-[12px] font-semibold text-ink-2">{t('demoTitle')}</p>
           <div className="grid grid-cols-2 gap-2">
             {[['man', 'demoMan'], ['man2', 'demoMan2'], ['woman', 'demoWoman'], ['woman2', 'demoWoman2']].map(([id, labelKey]) => (
@@ -317,7 +317,7 @@ export default function AuthScreen() {
       )}
         {error && <div role="alert" className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] text-[#991b1b]">{error}</div>}
       {pendingVendor && !googleUser && (
-        <div className="pt-4 space-y-2">
+        <div className="auth-actions pt-4 space-y-2">
           <p className="rounded-xl bg-cream-2 px-4 py-3 text-[12px] leading-5 text-ink-2">{t(vendorState === 'deleted' ? 'deletedVendorSessionNote' : 'vendorSessionNote')}</p>
           {vendorState === 'new' && <button
             type="button"
