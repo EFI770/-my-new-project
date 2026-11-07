@@ -13,12 +13,12 @@ try {
   const page = await browser.newPage();
   await page.setViewport({width:360,height:800});
   await page.setRequestInterception(true);
-  page.on('request', r => {
+  page.on('request', async r => {
     const u = new URL(r.url());
     if (u.hostname !== '127.0.0.1') return r.abort();
     if (u.pathname === '/src/firebase.js') return r.respond({status:200,contentType:'application/javascript',body:`
       const user = {displayName:'Synthetic learner'};
-      window.fixture = {pending:true,failDelete:true};
+      window.fixture = {pending:true,failDelete:true,state:'deleted'};
       export async function initFirebase() {}
       export function currentFirebaseUser() {return window.fixture.pending ? user : null;}
       export async function signInWithGoogle() {window.fixture.pending=true;return user;}
@@ -26,6 +26,10 @@ try {
       export async function deleteFirebaseUser() {if(window.fixture.failDelete)throw new Error('synthetic popup cancelled');window.fixture.pending=false;}
     `});
     if (u.pathname === '/api/auth/providers') return r.respond({status:200,contentType:'application/json',body:JSON.stringify({firebase:{enabled:true,config:{projectId:'synthetic'}},email:{enabled:false},demo:{enabled:false}})});
+    if (u.pathname === '/api/auth/status') {
+      const state = await page.evaluate(()=>window.fixture.state);
+      return r.respond({status:200,contentType:'application/json',body:JSON.stringify({state})});
+    }
     if (u.pathname.startsWith('/api/')) return r.respond({status:401,contentType:'application/json',body:'{"error":"authentication_required"}'});
     r.continue();
   });
@@ -37,6 +41,7 @@ try {
   const assert = (condition,name) => {if(!condition)throw new Error(name);console.log(`ok - ${name}`);};
   await page.goto('http://127.0.0.1:4176/#/auth',{waitUntil:'networkidle0'});
   await page.waitForFunction(()=>document.body.textContent.includes('מחיקת רשומת הכניסה'));
+  assert(!await page.evaluate(()=>Array.from(document.querySelectorAll('button')).some(b=>b.textContent.trim()==='סיום הרשמה')),'deleted state has no impossible signup button');
   await clickText('מחיקת רשומת הכניסה');
   await page.waitForSelector('[role="alert"]');
   assert((await page.$eval('[role="alert"]',e=>e.textContent)).includes('מפעיל הקהילה'),'cancelled retry shows persistent support error');
@@ -52,8 +57,9 @@ try {
   assert(!overflows,'English recovery screen fits 320px');
   await page.evaluate(()=>window.fixture.failDelete=false);
   await clickText('Remove sign-in record');
-  await page.waitForFunction(()=>!document.body.textContent.includes('An active Google sign-in record'));
+  await page.waitForFunction(()=>!document.body.textContent.includes('Your app account was deleted.'));
   assert(!await page.$('[role="alert"]'),'successful retry clears error');
+  await page.evaluate(()=>window.fixture.state='new');
   await clickText('Continue with Google');
   await page.waitForFunction(()=>document.body.textContent.includes('You signed in with Google.'));
   assert(!await page.$eval('button',()=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Continue with Google').disabled),'popup success resets busy flag despite early return');

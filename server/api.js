@@ -205,6 +205,23 @@ function route(method, pattern, handler) {
 }
 
 // ---------- auth (dev-only) ----------
+// Own-identity lifecycle state only: requires a verified vendor token and
+// never accepts a client-supplied subject. Distinguishes deleted from new.
+route('GET', '/api/auth/status', async (req, res) => {
+  if (!vendorAuth) return send(res, 404, { error: 'not_found' });
+  const token = (req.headers.authorization || '').replace(/^Bearer /i, '');
+  let payload;
+  try { payload = await vendorAuth.verify(token); }
+  catch { return send(res, 401, { error: 'authentication_required' }); }
+  const state = await db.asService(async (c) => {
+    const result = await c.query(`select
+      exists(select 1 from auth.deleted_subs where auth_sub=$1) as deleted,
+      exists(select 1 from auth.users where auth_sub=$1) as registered`, [payload.sub]);
+    return result.rows[0].deleted ? 'deleted' : result.rows[0].registered ? 'registered' : 'new';
+  });
+  send(res, 200, { state });
+});
+
 route('POST', '/api/auth/register', async (req, res) => {
   if (rateLimited(`reg:${req.socket.remoteAddress}`, 10, 3600_000)) return send(res, 429, { error: 'rate_limited' });
   // Gated synthetic preview: password auth is BLOCKED AT THE API here (not

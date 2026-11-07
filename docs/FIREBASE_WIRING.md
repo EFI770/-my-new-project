@@ -45,7 +45,7 @@ Local node server: same variables via `CHAVRUTA_AUTH_MODE=firebase` + env.
 
 `scripts/test-api-firebase-local.sh` boots a throwaway Postgres, starts the API
 in firebase mode with a LOCAL JWKS override, and runs
-`server/harness/api-firebase.mjs` (25 assertions): garbage/forged/wrong-audience/
+`server/harness/api-firebase.mjs` (28 assertions): garbage/forged/wrong-audience/
 wrong-issuer/expired tokens all 401; register validation (gender + 18+
 attestation mandatory); auth_sub binding incl. re-register 409; same-gender RLS
 visibility; contact-free candidate payloads; providers endpoint shape; deletion
@@ -115,3 +115,11 @@ RETENTION RECORD (PROVISIONAL - owner decision pending, 2026-11-07):
 2. Project settings > Your apps > web app > copy the `firebaseConfig` values
    into the secrets store (never into chat, never into the repo).
 3. Optional: restrict the API key (console > Credentials) to Firebase APIs.
+
+
+Own-identity recovery state: GET /api/auth/status accepts only a verified
+vendor token and returns new, registered, or deleted for that token's subject.
+The recovery screen offers Finish signup only for new identities. Deleted
+identities get record-removal retry and operator-support wording, not an
+impossible registration invitation. Synthetic tests cover all states and
+invalid-token rejection. This does not establish the owner's re-entry policy.

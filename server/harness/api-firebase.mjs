@@ -150,6 +150,15 @@ ok('F14b deleted user is anonymous again', afterA.status === 401);
 const reReg = await api('POST', '/api/auth/register', { jwt: A.jwt, body: { displayName: 'אבי אשכנזי', gender: 'man', attestAdult: true } });
 ok('F15 deleted+still-valid token re-register 403 account_deleted', reReg.status === 403 && reReg.data?.error === 'account_deleted', JSON.stringify(reReg));
 
+const ownDeleted = await api('GET', '/api/auth/status', {jwt:A.jwt});
+ok('F20 own deleted state is explicit', ownDeleted.status === 200 && ownDeleted.data?.state === 'deleted');
+const invalidState = await api('GET', '/api/auth/status', {jwt:'garbage'});
+ok('F20b state requires valid own token', invalidState.status === 401);
+const New = await mintToken({sub:`new-state-${RUN}`});
+const ownNew = await api('GET', '/api/auth/status', {jwt:New});
+const ownExisting = await api('GET', '/api/auth/status', {jwt:B.jwt});
+ok('F20c new versus existing state distinguished', ownNew.data?.state === 'new' && ownExisting.data?.state === 'registered');
+
 // F16 no over-blocking: a different vendor subject still registers fine
 const D = { sub: `uid-d-${RUN}`, email: `d-${RUN}@example.com` };
 D.jwt = await mintToken(D);

@@ -28,11 +28,18 @@ export default function AuthScreen() {
   // failed record erasure, or sign-in abandoned before registration): offer
   // finish-signup or explicit record removal with a retry + support route.
   const [pendingVendor, setPendingVendor] = useState(null);
+  const [vendorState, setVendorState] = useState(null);
   useEffect(() => { api.providers().then(setProviders).catch(() => {}); }, []);
   useEffect(() => {
     if (!providers?.firebase?.enabled || !providers.firebase.config) return;
     initFirebase(providers.firebase.config)
-      .then(() => { const u = currentFirebaseUser(); if (u) setPendingVendor(u); })
+      .then(async () => {
+        const u = currentFirebaseUser();
+        if (!u) return;
+        const status = await api.authStatus();
+        setVendorState(status.state);
+        if (status.state !== 'registered') setPendingVendor(u);
+      })
       .catch(() => {});
   }, [providers]);
 
@@ -58,19 +65,22 @@ export default function AuthScreen() {
         // already registered with the community.
         await initFirebase(providers.firebase.config);
         const user = await signInWithGoogle();
-        try {
-          await api.me();
+        const status = await api.authStatus();
+        setVendorState(status.state);
+        if (status.state === 'registered') {
           showToast(t('toastWelcome'));
           await refreshMe();
           navigate('find');
-          return;
-        } catch (e) {
-          if (e?.status !== 401) throw e;
+        } else if (status.state === 'new') {
           setGoogleUser(user);
           setDisplayName(user.displayName || '');
           setMode('register');
-          return;
+        } else {
+          setPendingVendor(user);
+          setGoogleUser(null);
+          setError(t('err_account_deleted'));
         }
+        return;
       }
       // Legacy Neon Auth (Better Auth) social flow is POST-then-redirect:
       // the endpoint returns {url} and the browser must navigate there.
@@ -308,15 +318,15 @@ export default function AuthScreen() {
         {error && <div role="alert" className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] text-[#991b1b]">{error}</div>}
       {pendingVendor && !googleUser && (
         <div className="pt-4 space-y-2">
-          <p className="rounded-xl bg-cream-2 px-4 py-3 text-[12px] leading-5 text-ink-2">{t('vendorSessionNote')}</p>
-          <button
+          <p className="rounded-xl bg-cream-2 px-4 py-3 text-[12px] leading-5 text-ink-2">{t(vendorState === 'deleted' ? 'deletedVendorSessionNote' : 'vendorSessionNote')}</p>
+          {vendorState === 'new' && <button
             type="button"
             onClick={() => { setGoogleUser(pendingVendor); setDisplayName(pendingVendor.displayName || ''); setMode('register'); }}
             disabled={oauthBusy}
             className="block w-full rounded-full bg-green-dark py-3 text-center text-[15px] font-semibold text-white disabled:opacity-60"
           >
             {t('finishSignup')}
-          </button>
+          </button>}
           <button
             type="button"
             onClick={removeVendorRecord}

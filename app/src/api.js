@@ -26,6 +26,7 @@ async function call(method, path, body) {
 export const api = {
   setTokenProvider: (fn) => { tokenProvider = fn; },
   providers: () => call('GET', '/api/auth/providers'),
+  authStatus: () => call('GET', '/api/auth/status'),
   register: (b) => call('POST', '/api/auth/register', b),
   login: (b) => call('POST', '/api/auth/login', b),
   demoLogin: (identity) => call('POST', '/api/auth/demo-login', { identity }),
