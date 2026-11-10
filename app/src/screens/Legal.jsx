@@ -145,13 +145,13 @@ export function Privacy() {
           <H>9. זכויותיך, שינויים ויצירת קשר</H>
           <P>בכפוף לחוק הגנת הפרטיות, התשמ"א-1981, יש לך זכות לעיין במידע שנשמר עליך, לבקש תיקונו או מחיקתו. חלק מהפעולות זמינות ישירות באפליקציה (עריכת פרופיל, מחיקת חשבון).</P>
           <P>שינוי מהותי במדיניות יפורסם באפליקציה לפני כניסתו לתוקף.</P>
-          <P>לפניות בנושא פרטיות: <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
+          <P>לפניות בנושא פרטיות: <a href="mailto:habrit770@gmail.com" className="underline">habrit770@gmail.com</a></P>
         </>}
         en={<>
           <H>9. Your rights, changes, and contact</H>
           <P>Under Israel's Privacy Protection Law, 1981, you have the right to review data held about you and to request its correction or deletion. Some actions are available directly in the app (edit profile, delete account).</P>
           <P>Material changes to this policy will be posted in the app before taking effect.</P>
-          <P>Privacy inquiries: <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
+          <P>Privacy inquiries: <a href="mailto:habrit770@gmail.com" className="underline">habrit770@gmail.com</a></P>
         </>}
       />
     </Shell>
