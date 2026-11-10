@@ -206,12 +206,12 @@ export function Accessibility() {
       <Section
         he={<>
           <H>יצירת קשר בנושא נגישות</H>
-          <P>נתקלתם בבעיית נגישות? פנו אלינו ונטפל: <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
+          <P>נתקלתם בבעיית נגישות? פנו אלינו ונטפל: <a href="mailto:habrit770@gmail.com" className="underline">habrit770@gmail.com</a></P>
           <P>פרטי הקשר לעיל הם של מפעיל האתר לפניות נגישות. אין בהצהרה זו אישור עמידה מלאה בתקן או קביעה בדבר פטור מחובות נגישות.</P>
         </>}
         en={<>
           <H>Accessibility contact</H>
-          <P>Encountered an accessibility problem? Contact us and we will handle it: <a href="mailto:efie770@gmail.com" className="underline">efie770@gmail.com</a></P>
+          <P>Encountered an accessibility problem? Contact us and we will handle it: <a href="mailto:habrit770@gmail.com" className="underline">habrit770@gmail.com</a></P>
           <P>The contact above is the site operator for accessibility inquiries. This statement is not certification of full compliance or a determination of an exemption.</P>
         </>}
       />
