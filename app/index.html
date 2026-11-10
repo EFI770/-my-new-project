@@ -13,9 +13,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="חברותא - מיזם קהילתי למציאת חברותא בכפר רתמים" />
     <title>חברותא • כפר רתמים</title>
+    <style>
+      /* Accessibility widget bottom-left: the app header owns the top-left corner */
+      #efi-a11y-btn { top: auto !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
+      #efi-a11y-panel { top: auto !important; bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important; max-height: calc(100dvh - 96px) !important; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script src="/a11y.js" defer></script>
   </body>
 </html>
